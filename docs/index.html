@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#ffffff">
+  <title>GachaFinder Japan 🇯🇵 | ガチャファインダー</title>
+  <meta name="description" content="Finde Gachapon & Capsule Toys in Japan (Bandai, Takara Tomy Arts, Kitan Club, Gacha-Island). Suche auf Deutsch, Englisch oder Japanisch nach JAN-Code oder Namen und prüfe Shop-Verfügbarkeiten auf der interaktiven Japan-Karte!">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%23ff4b5c'/><path d='M2,50 A48,48 0 0,1 98,50 Z' fill='%23ffffff'/><circle cx='50' cy='50' r='14' fill='%23ffffff' stroke='%23333333' stroke-width='6'/><circle cx='50' cy='50' r='6' fill='%23ff4b5c'/><line x1='2' y1='50' x2='36' y2='50' stroke='%23333333' stroke-width='6'/><line x1='64' y1='50' x2='98' y2='50' stroke='%23333333' stroke-width='6'/><circle cx='50' cy='50' r='48' fill='none' stroke='%23333333' stroke-width='6'/></svg>">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-logo">
+        <div class="capsule-icon">
+          <div class="capsule-top"></div>
+          <div class="capsule-divider"></div>
+          <div class="capsule-bottom"></div>
+        </div>
+        <div class="brand-text">
+          <h1>GachaFinder <span>Japan</span></h1>
+          <p class="tagline">カプセルトイ 在庫＆店舗検索ナビ</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- Backend Status Pill (GitHub Pages & Live Indicator) -->
+        <button type="button" class="btn-server-status" id="btnServerStatus" title="Server-Status & Backend-Einstellungen">
+          <span class="status-indicator-dot online"></span>
+          <span class="server-status-text" id="serverStatusText">Online</span>
+        </button>
+
+        <!-- Favorites Button in Header -->
+        <button type="button" class="btn-fav-header" id="btnOpenFavorites" title="Gemerkte Gachas & Favoriten">
+          <span class="fav-icon">❤️</span>
+          <span class="fav-text">Gemerkt</span>
+          <span id="favCounterBadge" class="fav-badge">0</span>
+        </button>
+
+        <a href="#help" class="info-link" id="btnHelp" title="Hilfe & Quellen">ℹ️ Info</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    <!-- Hero / Search Section -->
+    <section class="search-section">
+      <div class="hero-content">
+        <h2>Finde dein Lieblings-Gachapon in Japan!</h2>
+        <p>Suche auf <strong>Deutsch, Englisch oder Japanisch</strong> (z. B. <em>Tagebücher der Apothekerin, Pokémon, Monster Hunter, Conan, Sakura, Kamera</em>) oder per Barcode (JAN).</p>
+      </div>
+
+      <!-- Search Form -->
+      <form class="search-form" id="searchForm">
+        <div class="search-input-wrapper">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="searchInput" 
+            class="search-input" 
+            placeholder="Auf Deutsch, Englisch oder Japanisch suchen (z. B. Apothekerin, Monster Hunter, Conan, Kamera)..."
+            autocomplete="off"
+            required
+          />
+          <button type="button" class="btn-clear" id="btnClear" title="Suche löschen" style="display:none;">✕</button>
+        </div>
+        <button type="submit" class="btn-submit" id="btnSubmit">
+          <span class="btn-text">Suchen</span>
+          <span class="btn-spinner" style="display: none;">⏳</span>
+        </button>
+        <button type="button" class="btn-save-search" id="btnSaveSearch" title="Diese Suche als Favorit merken">
+          ⭐ Merken
+        </button>
+      </form>
+
+      <!-- Saved Searches Bar (Direct Access on Main Page) -->
+      <div class="saved-searches-bar" id="savedSearchesBar" style="display: none;">
+        <span class="saved-searches-label">⭐ Gemerkte Suchen:</span>
+        <div class="saved-searches-chips" id="savedSearchesChips"></div>
+        <button type="button" class="btn-clear-all-searches" id="btnClearAllSearches" title="Alle gemerkten Suchen entfernen">Alle leeren</button>
+      </div>
+
+      <!-- Translation Notice Banner -->
+      <div class="translation-notice" id="translationNotice" style="display: none;"></div>
+
+      <!-- Maker Filter Pills -->
+      <div class="maker-filters">
+        <span class="filter-label">Quellen & Hersteller:</span>
+        <button type="button" class="maker-pill active" data-maker="all">Alle Quellen</button>
+        <button type="button" class="maker-pill" data-maker="bandai">Bandai (ガシャポン)</button>
+        <button type="button" class="maker-pill" data-maker="takaratomy">Takara Tomy Arts (ガチャ)</button>
+        <button type="button" class="maker-pill" data-maker="island">🏝️ Gacha-Island</button>
+        <button type="button" class="maker-pill" data-maker="kitan">Kitan Club</button>
+      </div>
+
+      <!-- Quick Search Suggestions -->
+      <div class="quick-tags">
+        <span class="quick-label">Beliebte Franchises:</span>
+        <button type="button" class="tag-chip" data-query="ざ・コンビニソフトめじるしチャーム">🍦 Soft Serve Charm</button>
+        <button type="button" class="tag-chip" data-query="おやさい妖精さん">🥬 Vegetable Fairies</button>
+        <button type="button" class="tag-chip" data-query="けみかるハムスター">🐹 Kemikaru Hamster</button>
+        <button type="button" class="tag-chip" data-query="Frieren">🪄 Frieren (フリーレン)</button>
+        <button type="button" class="tag-chip" data-query="Tagebücher der Apothekerin">🧪 Apothekerin (薬屋)</button>
+        <button type="button" class="tag-chip" data-query="Card Captor Sakura">🌸 Cardcaptor Sakura</button>
+        <button type="button" class="tag-chip" data-query="Pokémon">⚡ Pokémon</button>
+        <button type="button" class="tag-chip" data-query="Monster Hunter">🐉 Monster Hunter</button>
+        <button type="button" class="tag-chip" data-query="Detektiv Conan">🔍 Detektiv Conan</button>
+        <button type="button" class="tag-chip" data-query="pins">📍 Pins & Anstecker</button>
+        <button type="button" class="tag-chip" data-query="parfaits">🍰 Parfaits & Süßes</button>
+        <button type="button" class="tag-chip" data-query="Chainsaw Man">🪚 Chainsaw Man</button>
+        <button type="button" class="tag-chip" data-query="One Piece">🏴‍☠️ One Piece</button>
+        <button type="button" class="tag-chip" data-query="Kamera (Canon)">📷 Kamera (Canon)</button>
+        <button type="button" class="tag-chip" data-query="Squishy">🍞 Squishy</button>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section" id="resultsSection">
+      <div class="results-header">
+        <div class="results-title-group">
+          <h3 id="resultsHeading">🔥 Beliebte & Aktuelle Gachas (Mit Live-Bestand)</h3>
+          <span class="results-count" id="resultsCount">8 Artikel</span>
+        </div>
+        <div class="results-controls">
+          <button type="button" class="btn-secondary" id="btnResetToPopular" style="display: none;">
+            ← Zurück zu Empfehlungen
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="loadingState" style="display: none;">
+        <div class="loading-capsule-spinner"></div>
+        <p>Durchsuche japanische Gachapon-Datenbanken...</p>
+        <small>Bandai, Takara Tomy Arts & Gacha-Island werden in Echtzeit abgefragt</small>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyState" style="display: none;">
+        <div class="empty-icon">📦</div>
+        <h4>Keine Gachas gefunden</h4>
+        <p>Versuche einen anderen Begriff (z. B. auf Deutsch oder Englisch) oder prüfe den 13-stelligen Barcode.</p>
+      </div>
+
+      <!-- Product Grid -->
+      <div class="product-grid" id="productGrid">
+        <!-- Dynamically injected via app.js -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Shop Availability Modal -->
+  <div class="modal-backdrop" id="shopModal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-maker-badge" id="modalMakerBadge">Bandai</span>
+          <h3 id="modalProductTitle">Produktname</h3>
+        </div>
+        <button type="button" class="btn-close-modal" id="btnCloseModal" title="Schließen">✕</button>
+      </div>
+
+      <!-- Product Summary Banner -->
+      <div class="modal-product-summary">
+        <img id="modalProductImg" src="" alt="" class="modal-thumb" />
+        <div class="modal-product-meta">
+          <div class="modal-meta-row">
+            <span id="modalProductPrice" class="modal-price"></span>
+            <span id="modalReleaseDate" class="modal-meta-pill">📅 Release: Lädt...</span>
+            <span id="modalLastChecked" class="modal-meta-pill">🕒 Bestandsdaten: Lädt...</span>
+          </div>
+          <p id="modalProductJan" class="modal-jan"></p>
+          <p id="modalProductDesc" class="modal-desc"></p>
+        </div>
+      </div>
+
+      <!-- Status Banner (In Stock, Out of Stock, Upcoming, Vintage) -->
+      <div id="modalStatusBanner" class="modal-status-banner"></div>
+
+      <!-- Multi-Source Platform Badges Box -->
+      <div class="modal-sources-box" id="modalSourcesBox" style="display: none;">
+        <span class="sources-label">🌐 Auch gefunden auf:</span>
+        <div class="sources-links-row" id="modalSourcesLinks"></div>
+      </div>
+
+      <!-- Shop Finder Controls Bar -->
+      <div class="shop-controls-bar">
+        <div class="pref-selector-wrapper">
+          <label for="prefSelect">📍 Region filtern:</label>
+          <select id="prefSelect" class="pref-select">
+            <option value="" selected>🇯🇵 Ganz Japan (Alle Standorte)</option>
+            <option value="13">東京都 (Tokyo - alle Bezirke)</option>
+            <option value="27">大阪府 (Osaka)</option>
+            <option value="26">京都府 (Kyoto)</option>
+            <option value="14">神奈川県 (Kanagawa / Yokohama)</option>
+            <option value="23">愛知県 (Aichi / Nagoya)</option>
+            <option value="40">福岡県 (Fukuoka)</option>
+            <option value="1">北海道 (Hokkaido / Sapporo)</option>
+          </select>
+        </div>
+
+        <div class="shop-count-bar-top">
+          <span id="shopCountText">🏬 Standorte werden geprüft...</span>
+        </div>
+
+        <div class="view-toggle">
+          <button type="button" class="view-btn active" id="btnViewMap">🗺️ Karte (<span id="countBadgeMap">0</span>)</button>
+          <button type="button" class="view-btn" id="btnViewList">📋 Liste (<span id="countBadgeList">0</span>)</button>
+        </div>
+      </div>
+
+      <!-- Modal Body: Map View & List View -->
+      <div class="modal-body">
+        <!-- Shop Loading Spinner -->
+        <div class="shop-loading" id="shopLoading" style="display: none;">
+          <div class="loading-capsule-spinner mini"></div>
+          <p>Lagerbestände und Automaten werden geladen...</p>
+        </div>
+
+        <!-- Map Container (Default View) -->
+        <div class="shop-map-container" id="shopMapContainer">
+          <div id="shopMap" class="shop-map"></div>
+        </div>
+
+        <!-- Shop List Container -->
+        <div class="shop-list-container" id="shopListContainer" style="display: none;">
+          <div class="shop-list" id="shopList">
+            <!-- Dynamically injected shop cards -->
+          </div>
+        </div>
+
+        <!-- Collector & Out-of-Stock Advice Box -->
+        <div id="modalCollectorBox" class="modal-collector-box" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Favorites & Watchlist Modal -->
+  <div class="modal-backdrop" id="favModal" style="display: none;">
+    <div class="modal-dialog fav-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3>❤️ Gemerkte Gachas & Such-Favoriten</h3>
+        </div>
+        <button type="button" class="btn-close-modal" id="btnCloseFav">✕</button>
+      </div>
+
+      <div class="fav-tabs-bar">
+        <button type="button" class="fav-tab active" id="tabFavItems">Gemerkt (<span id="tabCountItems">0</span>)</button>
+        <button type="button" class="fav-tab" id="tabFavSearches">Gespeicherte Suchen (<span id="tabCountSearches">0</span>)</button>
+      </div>
+
+      <div class="modal-body fav-body">
+        <!-- Saved Items Panel -->
+        <div class="fav-panel" id="panelFavItems">
+          <div class="fav-items-grid" id="favItemsGrid">
+            <!-- Injected via app.js -->
+          </div>
+        </div>
+
+        <!-- Saved Searches Panel -->
+        <div class="fav-panel" id="panelFavSearches" style="display: none;">
+          <div class="fav-searches-list" id="favSearchesList">
+            <!-- Injected via app.js -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help & About Modal -->
+  <div class="modal-backdrop" id="helpModal" style="display: none;">
+    <div class="modal-dialog help-dialog">
+      <div class="modal-header">
+        <h3>ℹ️ Über den Gacha Finder Japan</h3>
+        <button type="button" class="btn-close-modal" id="btnCloseHelp">✕</button>
+      </div>
+      <div class="modal-body help-body">
+        <h4>Was ist diese App?</h4>
+        <p>In Japan veröffentlichen führende Hersteller wie <strong>Bandai (Gashapon)</strong> und <strong>Takara Tomy Arts (Gacha)</strong> sowie Plattformen wie <strong>Gacha-Island</strong> und <strong>GachaNavi</strong> offizielle Lagerbestandsdaten für Tausende von Automaten an Bahnhöfen, in Spielwarenläden und Einkaufszentren.</p>
+        
+        <h4>Unterstützte Quellen & Partner-Plattformen:</h4>
+        <div class="maker-info-grid">
+          <div class="maker-card">
+            <strong>Bandai Gashapon</strong>
+            <span>gashapon.jp</span>
+            <small>Live-Abfrage von Gashapon Bandai Official Shops & Automaten.</small>
+          </div>
+          <div class="maker-card">
+            <strong>Takara Tomy Arts</strong>
+            <span>takaratomy-arts.co.jp</span>
+            <small>Offizielle Händlerlisten und Geo-Pins für ganz Japan.</small>
+          </div>
+          <div class="maker-card">
+            <strong>Gacha-Island (ガチャアイランド)</strong>
+            <span>gacha-island.jp</span>
+            <small>Herstellerübergreifendes Archiv & Review-Portal (Bandai, Bushiroad, Toys Cabin etc.).</small>
+          </div>
+          <div class="maker-card">
+            <strong>GachaNavi (がちゃなび)</strong>
+            <span>gachanavi.com</span>
+            <small>Umfassender Monats-Release-Kalender für Kapsel-Sammler.</small>
+          </div>
+        </div>
+
+        <h4>Wie geht die App mit vergriffenen oder alten Gachas um?</h4>
+        <ul>
+          <li><strong>🟢 Auf Lager:</strong> Live-Standorte mit Google Maps-Routenplanung und Karte.</li>
+          <li><strong>⏳ Vorankündigung:</strong> Neu angekündigte Gachas, die erst in den kommenden Wochen/Monaten an Automaten erscheinen.</li>
+          <li><strong>🔴 Derzeit vergriffen (Out of Stock):</strong> Aktuelle Sets, die an Automaten vorübergehend leer sind.</li>
+          <li><strong>📦 Uralt-Gachas / Archiv:</strong> Ältere Kollektionen. Hier bietet die App direkte 1-Klick-Links zu Sammlerbörsen (Surugaya, Mercari, Yahoo Auctions) und zu den Second-Hand-Zentren in <strong>Akihabara</strong> und <strong>Nakano Broadway</strong>!</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backend Settings Modal (For GitHub Pages & Custom API) -->
+  <div class="modal-backdrop" id="settingsModal" style="display: none;">
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-header">
+        <h3 class="modal-title">⚙️ Server & GitHub Pages Modus</h3>
+        <button type="button" class="modal-close" id="btnCloseSettings">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <p style="font-size:0.85rem; color:#475569; margin-bottom:12px; line-height:1.5;">
+          Wenn diese Seite auf <strong>GitHub Pages</strong> gehostet wird, kannst du hier die URL deines Backends (z. B. auf Render, Railway oder ngrok) angeben. Ohne Backend läuft die Seite im <strong>Offline / Demo-Modus</strong> mit integriertem Katalog & Karten.
+        </p>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:6px;">Backend API-URL:</label>
+          <input type="url" id="backendUrlInput" class="search-input" placeholder="z. B. https://gacha-api.onrender.com oder http://localhost:8000" style="height:42px; font-size:0.85rem; width:100%; border:1.5px solid var(--border-color); border-radius:8px; padding:0 12px;" />
+          <small style="color:#64748b; font-size:0.75rem; display:block; margin-top:4px;">Standard: Leer lassen (verwendet denselben Origin / lokales Backend).</small>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn-submit" id="btnSaveBackendUrl" style="height:40px; font-size:0.85rem; padding:0 16px;">Speichern</button>
+          <button type="button" class="btn-secondary" id="btnResetBackendUrl" style="height:40px; font-size:0.85rem; padding:0 14px;">Zurücksetzen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar (Sticky Thumb Navigation) -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <button type="button" class="mobile-nav-btn active" id="mNavSearch">
+      <span class="m-nav-icon">🔍</span>
+      <span class="m-nav-text">Suche</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" id="mNavSaved">
+      <span class="m-nav-icon">⭐</span>
+      <span class="m-nav-text">Gemerkt</span>
+      <span class="m-nav-badge" id="mNavSavedBadge" style="display:none;">0</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" id="mNavFavs">
+      <span class="m-nav-icon">❤️</span>
+      <span class="m-nav-text">Favoriten</span>
+      <span class="m-nav-badge" id="mNavFavBadge">0</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" id="mNavHubs">
+      <span class="m-nav-icon">🗺️</span>
+      <span class="m-nav-text">Mega-Hubs</span>
+    </button>
+  </nav>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <script src="app.js"></script>
+</body>
+</html>
