@@ -1,303 +1,20 @@
 /**
- * GachaFinder Japan - Frontend Application v2.7
- * 
+ * GachaFinder Japan - Frontend Application v2.6
  * Features:
- * - Hosted on GitHub Pages & local FastAPI backend compatible
- * - Mobile bottom thumb-navigation bar & mobile-optimized touch UI
- * - Direct "⭐ Gemerkte Suchen" bar with 1-click execution & delete
- * - Real-time availability status sync (eliminates card vs map discrepancy)
- * - Full interactive map for Gacha-Island & independent makers (24+ Premier Mega-Hubs in Japan)
- * - Offline / Demo fallback dataset for standalone GitHub Pages usage
- * - Expanded translations (Vegetable Fairies, Soft Serve Mejirushi Charm, Pins, Sweets, Parfaits, etc.)
+ * - Multilingual search (German/English/Romaji -> Japanese) with expanded franchises (Frieren, Kemikaru Hamster, Sakura, etc.)
+ * - Prominent release date badges directly on search overview tiles
+ * - Multi-source aggregation & cross-linking (Bandai + Gacha-Island + GachaNavi)
+ * - Availability status badges on search cards (🟢 In Stock, ⏳ Upcoming, 🔴 Out of Stock, 📦 Archived)
+ * - Favorites & Bookmark system (saved items and search queries) in localStorage
+ * - Accurate store inventory & caching (Tokyo returns all official stores)
+ * - Interactive Leaflet Japan map with live store count indicators
  */
 
-// ---------------------------------------------------------
-// API Base URL Resolution (Local Server or GitHub Pages with Custom Backend)
-// ---------------------------------------------------------
-function getApiBaseUrl() {
-  const custom = localStorage.getItem('gacha_backend_url');
-  if (custom && custom.trim()) {
-    return custom.trim().replace(/\/+$/, '');
-  }
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return window.location.port === '8000' ? '' : 'http://localhost:8000';
-  }
-  return '';
-}
+const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+  ? (window.location.port === '8000' ? '' : 'http://localhost:8000')
+  : '';
 
-let API_BASE = getApiBaseUrl();
-
-// ---------------------------------------------------------
-// Built-In Fallback Data (Enables 100% Functionality on GitHub Pages)
-// ---------------------------------------------------------
-const FALLBACK_PREFECTURES = [
-  {"code": "1", "name": "北海道", "name_en": "Hokkaido"},
-  {"code": "13", "name": "東京都", "name_en": "Tokyo"},
-  {"code": "14", "name": "神奈川県", "name_en": "Kanagawa"},
-  {"code": "23", "name": "愛知県", "name_en": "Aichi"},
-  {"code": "26", "name": "京都府", "name_en": "Kyoto"},
-  {"code": "27", "name": "大阪府", "name_en": "Osaka"},
-  {"code": "40", "name": "福岡県", "name_en": "Fukuoka"}
-];
-
-const FALLBACK_HUBS = [
-  {
-    "shop_name": "【#C-pla】Shibuya Center-gai Mega-Store (1.200+ Automaten)",
-    "prefecture": "東京都",
-    "pref_code": "13",
-    "address": "東京都渋谷区宇田川町23-11 渋谷センター街",
-    "phone": "03-6455-2980",
-    "latitude": 35.6598,
-    "longitude": 139.6980,
-    "stock_status": "Verfügbar / Gacha-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6598,139.6980"
-  },
-  {
-    "shop_name": "【Gashapon no Mori】Ikebukuro Sunshine City (3.000+ Automaten - Weltgrößtes Zentrum)",
-    "prefecture": "東京都",
-    "pref_code": "13",
-    "address": "東京都豊島区東池袋3-1-3 サンシャインシティ ワールドインポートマートビル3F",
-    "phone": "03-5953-6571",
-    "latitude": 35.7289,
-    "longitude": 139.7188,
-    "stock_status": "Verfügbar / Gacha-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.7289,139.7188"
-  },
-  {
-    "shop_name": "【#C-pla】Akihabara Central Street (1.000+ Automaten)",
-    "prefecture": "東京都",
-    "pref_code": "13",
-    "address": "東京都千代田区外神田3-16-17",
-    "phone": "03-5298-5080",
-    "latitude": 35.6998,
-    "longitude": 139.7712,
-    "stock_status": "Verfügbar / Gacha-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6998,139.7712"
-  },
-  {
-    "shop_name": "【Akihabara Radio Kaikan】Gashapon Specialty Corner B1 & 2F",
-    "prefecture": "東京都",
-    "pref_code": "13",
-    "address": "東京都千代田区外神田1-15-16 秋葉原ラジオ会館",
-    "phone": "03-3251-3711",
-    "latitude": 35.6980,
-    "longitude": 139.7718,
-    "stock_status": "Verfügbar / Sammler-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6980,139.7718"
-  },
-  {
-    "shop_name": "【Gashapon Official Shop】Tokyo Station Character Street",
-    "prefecture": "東京都",
-    "pref_code": "13",
-    "address": "東京都千代田区丸の内1-9-1 東京駅一番街 B1F",
-    "phone": "03-3210-0077",
-    "latitude": 35.6812,
-    "longitude": 139.7671,
-    "stock_status": "Verfügbar / Flagship",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6812,139.7671"
-  },
-  {
-    "shop_name": "【Gacha-Gacha no Mori】Olinas Kinshicho 3F (Große Tier- & Indie-Auswahl)",
-    "prefecture": "東京都",
-    "pref_code": "13",
-    "address": "東京都墨田区太平4-1-2 オリナス錦糸町3F",
-    "phone": "080-4114-3729",
-    "latitude": 35.7004,
-    "longitude": 139.8154,
-    "stock_status": "Verfügbar / Gacha-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.7004,139.8154"
-  },
-  {
-    "shop_name": "【Nakano Broadway】Capsule & Toy Arcade B1F",
-    "prefecture": "東京都",
-    "pref_code": "13",
-    "address": "東京都中野区中野5-52-15 中野ブロードウェイ",
-    "phone": "03-3388-7004",
-    "latitude": 35.7089,
-    "longitude": 139.6657,
-    "stock_status": "Verfügbar / Vintage & Indie",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.7089,139.6657"
-  },
-  {
-    "shop_name": "【#C-pla】Shinsaibashi-suji Flagship Mega-Store (1.500+ Automaten)",
-    "prefecture": "大阪府",
-    "pref_code": "27",
-    "address": "大阪府大阪市中央区心斎橋筋1-6-10",
-    "phone": "06-6241-1180",
-    "latitude": 34.6710,
-    "longitude": 135.5015,
-    "stock_status": "Verfügbar / Gacha-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=34.6710,135.5015"
-  },
-  {
-    "shop_name": "【Gacha-Gacha no Mori】Umeda HEP FIVE 4F",
-    "prefecture": "大阪府",
-    "pref_code": "27",
-    "address": "大阪府大阪市北区角田町5-15 HEP FIVE 4F",
-    "phone": "06-6366-3690",
-    "latitude": 34.7037,
-    "longitude": 135.5002,
-    "stock_status": "Verfügbar / Gacha-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=34.7037,135.5002"
-  },
-  {
-    "shop_name": "【#C-pla】Kyoto Shijo Kawaramachi Mega-Store",
-    "prefecture": "京都府",
-    "pref_code": "26",
-    "address": "京都府京都市中京区河原町通四条上る塩屋町330",
-    "phone": "075-256-8810",
-    "latitude": 35.0037,
-    "longitude": 135.7698,
-    "stock_status": "Verfügbar / Gacha-Hub",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.0037,135.7698"
-  },
-  {
-    "shop_name": "【Gashapon Official Shop】Yokohama World Porters",
-    "prefecture": "神奈川県",
-    "pref_code": "14",
-    "address": "神奈川県横浜市中区新港2-2-1 横浜ワールドポーターズ2F",
-    "phone": "045-222-2000",
-    "latitude": 35.4542,
-    "longitude": 139.6420,
-    "stock_status": "Verfügbar / Flagship",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.4542,139.6420"
-  },
-  {
-    "shop_name": "【#C-pla】Sapporo Tanukikoji 5-chome Mega-Store (Ursprungsort von #C-pla)",
-    "prefecture": "北海道",
-    "pref_code": "1",
-    "address": "北海道札幌市中央区南3条西5丁目 狸小路商店街",
-    "phone": "011-200-9880",
-    "latitude": 43.0570,
-    "longitude": 141.3520,
-    "stock_status": "Verfügbar / Flagship",
-    "google_maps_url": "https://www.google.com/maps/search/?api=1&query=43.0570,141.3520"
-  }
-];
-
-const FALLBACK_ITEMS = [
-  {
-    "id": "4582769769337000",
-    "maker": "Bandai",
-    "title": "TVアニメ『薬屋のひとりごと』 まちぼうけ",
-    "price": "400円",
-    "image_url": "https://bandai-a.akamaihd.net/bc/img/model/b/1000229230_1.jpg",
-    "jan_code": "4582769769337",
-    "release_date": "2026年9月 第4週",
-    "category": "ガシャポン",
-    "detail_url": "https://gashapon.jp/products/detail.php?jan_code=4582769769337000",
-    "description": "猫猫（マオマオ）や壬氏（ジンシ）たちがちょこんと座って待っているまちぼうけシリーズ！全国78店舗以上で稼働中。",
-    "availability_status": "IN_STOCK",
-    "other_sources": [
-      { "name": "Gacha-Island", "url": "https://gacha-island.jp/2659/", "badge": "badge-island" },
-      { "name": "GachaNavi", "url": "https://gachanavi.com/?s=%E8%96%AC%E5%B1%8B%E3%81%AE%E3%81%B2%E3%81%A8%E3%82%8A%E3%81%94%E3%81%A8", "badge": "badge-other" }
-    ]
-  },
-  {
-    "id": "island_softserve",
-    "maker": "Gacha Island (トイズスピリッツ)",
-    "title": "ざ・コンビニソフトめじるしチャーム (The Convenience Store Soft Serve)",
-    "price": "300円 / 全5種",
-    "image_url": "https://bandai-a.akamaihd.net/bc/img/model/b/1000259527_1.jpg",
-    "jan_code": null,
-    "release_date": "2026年7月",
-    "category": "めじるしチャーム",
-    "detail_url": "https://gacha-island.jp/48120/",
-    "description": "コンビニのあのアイスが超リアルなミニチュアめじるしチャームに！シリコンリング付きで傘やペットボトルに装着可能。",
-    "availability_status": "HUBS_AVAILABLE",
-    "other_sources": [
-      { "name": "Gacha-Island", "url": "https://gacha-island.jp/48120/", "badge": "badge-island" }
-    ]
-  },
-  {
-    "id": "island_oyasai",
-    "maker": "Gacha Island (クオリア)",
-    "title": "おやさい妖精さん vol.1 (Vegetable Fairies)",
-    "price": "400円 / 全6種",
-    "image_url": "https://bandai-a.akamaihd.net/bc/img/model/b/1000254930_2.jpg",
-    "jan_code": null,
-    "release_date": "2026年8月",
-    "category": "カプセルフィギュア",
-    "detail_url": "https://gacha-island.jp/45902/",
-    "description": "ぽん吉氏が描く大人気「おやさい妖精さん」シリーズ！白菜犬やキャベツ豚など愛らしすぎる野菜の妖精たちがフィギュアに。",
-    "availability_status": "HUBS_AVAILABLE",
-    "other_sources": [
-      { "name": "Gacha-Island", "url": "https://gacha-island.jp/45902/", "badge": "badge-island" }
-    ]
-  },
-  {
-    "id": "island_51223",
-    "maker": "Gacha Island (ウルトラニュープランニング)",
-    "title": "けみかるハムスタースクイーズ！",
-    "price": "200円 / 全6種",
-    "image_url": "https://gacha-island.jp/wp-content/uploads/2026/09/29_%EF%BD%B9%EF%BD%B0%EF%BD%B6%EF%BD%B9%EF%BE%91%EF%BD%BD%EF%BD%BF%EF%BD%B0%EF%BD%BD%EF%BD%AF%EF%BD%B2%EF%BD%B0%EF%BD%BD%EF%BE%9E_w-300x274.jpg",
-    "jan_code": null,
-    "release_date": "2026年11月",
-    "category": "スクイーズ",
-    "detail_url": "https://gacha-island.jp/51223/",
-    "description": "ぷにぷに感触がたまらない、理科室モチーフのキュートな「けみかるハムスター」スクイーズ！",
-    "availability_status": "HUBS_AVAILABLE",
-    "other_sources": [
-      { "name": "Gacha-Island", "url": "https://gacha-island.jp/51223/", "badge": "badge-island" }
-    ]
-  },
-  {
-    "id": "4582770095142000",
-    "maker": "Bandai",
-    "title": "＃ハッシュタグつける 葬送のフリーレン",
-    "price": "300円",
-    "image_url": "https://bandai-a.akamaihd.net/bc/img/model/b/1000259527_1.jpg",
-    "jan_code": "4582770095142",
-    "release_date": "2026年11月未定",
-    "category": "ガシャポン",
-    "detail_url": "https://gashapon.jp/products/detail.php?jan_code=4582770095142000",
-    "description": "フリーレンやフェルンたちの名言ハッシュタグチャーム！（Vorankündigung für November 2026）",
-    "availability_status": "UPCOMING"
-  },
-  {
-    "id": "4570118183859000",
-    "maker": "Bandai",
-    "title": "ポケットモンスター ガシャっとコレクト07",
-    "price": "300円",
-    "image_url": "https://bandai-a.akamaihd.net/bc/img/model/b/1000258661_2.jpg",
-    "jan_code": "4570118183859",
-    "release_date": "2026年9月 第4週",
-    "category": "ガシャポン",
-    "detail_url": "https://gashapon.jp/products/detail.php?jan_code=4570118183859000",
-    "description": "モンスターボール形状のカプセルから人気ポケモンフィギュアが登場！全国84店舗展開中。",
-    "availability_status": "IN_STOCK"
-  },
-  {
-    "id": "Y904783",
-    "maker": "Takara Tomy Arts",
-    "title": "トムとジェリー ジェリー Funny moment めじるしガチャマスコット",
-    "price": "300円",
-    "image_url": "https://www.takaratomy-arts.co.jp/upfiles/products/Y904783_b.jpg",
-    "jan_code": "4904790904783",
-    "release_date": "2026年10月",
-    "category": "ガチャ",
-    "detail_url": "https://www.takaratomy-arts.co.jp/items/item.html?n=Y904783",
-    "description": "傘やペットボトルにつけて自分用の目印にできるジェリーのめじるしマスコット。",
-    "availability_status": "IN_STOCK"
-  },
-  {
-    "id": "4582770137750000",
-    "maker": "Bandai",
-    "title": "ポンデクルール ちいかわ マルチカラーパウダー",
-    "price": "500円",
-    "image_url": "https://bandai-a.akamaihd.net/bc/img/model/b/1000259513_2.jpg",
-    "jan_code": "4582770137750",
-    "release_date": "2026年10月",
-    "category": "ガシャポン",
-    "detail_url": "https://gashapon.jp/products/detail.php?jan_code=4582770137750000",
-    "description": "大人気「ちいかわ」のマルチカラーパウダー。店頭機では現在大人気のため完売中（Out of Stock）。",
-    "availability_status": "OUT_OF_STOCK"
-  }
-];
-
-// ---------------------------------------------------------
 // Application State
-// ---------------------------------------------------------
 const state = {
   currentMaker: 'all',
   currentQuery: '',
@@ -312,16 +29,13 @@ const state = {
   currentView: 'map',    // Default: Map View!
   map: null,
   markersLayer: null,
-  isOnline: true,
   favorites: {
     items: [],
     searches: []
   }
 };
 
-// ---------------------------------------------------------
-// DOM Elements
-// ---------------------------------------------------------
+// DOM Elements - Search
 const searchForm = document.getElementById('searchForm');
 const searchInput = document.getElementById('searchInput');
 const btnClear = document.getElementById('btnClear');
@@ -337,30 +51,7 @@ const btnResetToPopular = document.getElementById('btnResetToPopular');
 const makerPills = document.querySelectorAll('.maker-pill');
 const tagChips = document.querySelectorAll('.tag-chip');
 
-// Direct Saved Searches Bar on Main Page
-const savedSearchesBar = document.getElementById('savedSearchesBar');
-const savedSearchesChips = document.getElementById('savedSearchesChips');
-const btnClearAllSearches = document.getElementById('btnClearAllSearches');
-
-// Server Status & Settings Modal
-const btnServerStatus = document.getElementById('btnServerStatus');
-const serverStatusText = document.getElementById('serverStatusText');
-const settingsModal = document.getElementById('settingsModal');
-const btnCloseSettings = document.getElementById('btnCloseSettings');
-const backendUrlInput = document.getElementById('backendUrlInput');
-const btnSaveBackendUrl = document.getElementById('btnSaveBackendUrl');
-const btnResetBackendUrl = document.getElementById('btnResetBackendUrl');
-
-// Mobile Bottom Navigation Bar
-const mobileBottomNav = document.getElementById('mobileBottomNav');
-const mNavSearch = document.getElementById('mNavSearch');
-const mNavSaved = document.getElementById('mNavSaved');
-const mNavSavedBadge = document.getElementById('mNavSavedBadge');
-const mNavFavs = document.getElementById('mNavFavs');
-const mNavFavBadge = document.getElementById('mNavFavBadge');
-const mNavHubs = document.getElementById('mNavHubs');
-
-// Shop Modal
+// DOM Elements - Shop Modal
 const shopModal = document.getElementById('shopModal');
 const btnCloseModal = document.getElementById('btnCloseModal');
 const modalMakerBadge = document.getElementById('modalMakerBadge');
@@ -386,7 +77,7 @@ const shopListContainer = document.getElementById('shopListContainer');
 const shopList = document.getElementById('shopList');
 const shopCountText = document.getElementById('shopCountText');
 
-// Favorites Modal
+// DOM Elements - Favorites Modal
 const btnOpenFavorites = document.getElementById('btnOpenFavorites');
 const favCounterBadge = document.getElementById('favCounterBadge');
 const favModal = document.getElementById('favModal');
@@ -400,7 +91,7 @@ const panelFavSearches = document.getElementById('panelFavSearches');
 const favItemsGrid = document.getElementById('favItemsGrid');
 const favSearchesList = document.getElementById('favSearchesList');
 
-// Help Modal
+// DOM Elements - Help Modal
 const helpModal = document.getElementById('helpModal');
 const btnHelp = document.getElementById('btnHelp');
 const btnCloseHelp = document.getElementById('btnCloseHelp');
@@ -412,41 +103,9 @@ const btnCloseHelp = document.getElementById('btnCloseHelp');
 document.addEventListener('DOMContentLoaded', () => {
   loadFavoritesFromStorage();
   setupEventListeners();
-  checkBackendHealth();
   loadPrefectures();
   loadPopularGachas();
 });
-
-
-// ---------------------------------------------------------
-// Backend Health Check & Settings
-// ---------------------------------------------------------
-async function checkBackendHealth() {
-  API_BASE = getApiBaseUrl();
-  try {
-    const res = await fetch(`${API_BASE}/api/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
-    if (res.ok) {
-      setBackendStatus(true, 'Online');
-      return;
-    }
-  } catch (e) {
-    // Backend not reachable
-  }
-  if (!API_BASE && window.location.hostname !== 'localhost') {
-    setBackendStatus(false, 'GitHub Pages (Demo/Offline)');
-  } else {
-    setBackendStatus(false, 'Offline / Demo');
-  }
-}
-
-function setBackendStatus(online, label) {
-  state.isOnline = online;
-  if (serverStatusText) serverStatusText.textContent = label;
-  const dot = btnServerStatus?.querySelector('.status-indicator-dot');
-  if (dot) {
-    dot.className = `status-indicator-dot ${online ? 'online' : 'offline'}`;
-  }
-}
 
 
 // ---------------------------------------------------------
@@ -479,16 +138,6 @@ function setupEventListeners() {
     saveCurrentSearch();
   });
 
-  // Clear all saved searches
-  if (btnClearAllSearches) {
-    btnClearAllSearches.addEventListener('click', () => {
-      if (confirm('Möchtest du alle gemerkten Suchbegriffe löschen?')) {
-        state.favorites.searches = [];
-        saveFavoritesToStorage();
-      }
-    });
-  }
-
   // Maker filter pills
   makerPills.forEach((pill) => {
     pill.addEventListener('click', () => {
@@ -508,7 +157,6 @@ function setupEventListeners() {
       searchInput.value = query;
       btnClear.style.display = 'flex';
       executeSearch(query);
-      window.scrollTo({ top: searchForm.offsetTop - 10, behavior: 'smooth' });
     });
   });
 
@@ -547,85 +195,6 @@ function setupEventListeners() {
   tabFavItems.addEventListener('click', () => switchFavTab('items'));
   tabFavSearches.addEventListener('click', () => switchFavTab('searches'));
 
-  // Backend Settings Modal Handlers
-  if (btnServerStatus) {
-    btnServerStatus.addEventListener('click', () => {
-      if (backendUrlInput) backendUrlInput.value = localStorage.getItem('gacha_backend_url') || '';
-      settingsModal.style.display = 'flex';
-    });
-  }
-  if (btnCloseSettings) {
-    btnCloseSettings.addEventListener('click', () => settingsModal.style.display = 'none');
-  }
-  if (settingsModal) {
-    settingsModal.addEventListener('click', (e) => {
-      if (e.target === settingsModal) settingsModal.style.display = 'none';
-    });
-  }
-  if (btnSaveBackendUrl) {
-    btnSaveBackendUrl.addEventListener('click', () => {
-      const val = (backendUrlInput.value || '').trim();
-      if (val) {
-        localStorage.setItem('gacha_backend_url', val);
-      } else {
-        localStorage.removeItem('gacha_backend_url');
-      }
-      settingsModal.style.display = 'none';
-      checkBackendHealth();
-      loadPopularGachas();
-    });
-  }
-  if (btnResetBackendUrl) {
-    btnResetBackendUrl.addEventListener('click', () => {
-      localStorage.removeItem('gacha_backend_url');
-      if (backendUrlInput) backendUrlInput.value = '';
-      settingsModal.style.display = 'none';
-      checkBackendHealth();
-      loadPopularGachas();
-    });
-  }
-
-  // Mobile Bottom Navigation Handlers
-  if (mNavSearch) {
-    mNavSearch.addEventListener('click', () => {
-      setActiveNavBtn(mNavSearch);
-      window.scrollTo({ top: searchForm.offsetTop - 15, behavior: 'smooth' });
-      searchInput.focus();
-    });
-  }
-  if (mNavSaved) {
-    mNavSaved.addEventListener('click', () => {
-      setActiveNavBtn(mNavSaved);
-      if (state.favorites.searches.length > 0 && savedSearchesBar) {
-        window.scrollTo({ top: savedSearchesBar.offsetTop - 20, behavior: 'smooth' });
-      } else {
-        openFavoritesModal('searches');
-      }
-    });
-  }
-  if (mNavFavs) {
-    mNavFavs.addEventListener('click', () => {
-      setActiveNavBtn(mNavFavs);
-      openFavoritesModal('items');
-    });
-  }
-  if (mNavHubs) {
-    mNavHubs.addEventListener('click', () => {
-      setActiveNavBtn(mNavHubs);
-      // Open Japan Premier Mega-Hubs Explorer directly!
-      openShopModal({
-        id: 'japan_hubs_explorer',
-        maker: 'Gacha-Island / Mega-Hubs',
-        title: '🗾 Japan Gacha Mega-Hubs & Flagship Stores',
-        price: '3.000+ Maschinen vor Ort',
-        release_date: 'Ganzjährig geöffnet',
-        image_url: 'https://gacha-island.jp/wp-content/uploads/2026/09/29_%EF%BD%B9%EF%BD%B0%EF%BD%B6%EF%BD%B9%EF%BE%91%EF%BD%BD%EF%BD%BF%EF%BD%B0%EF%BD%BD%EF%BD%AF%EF%BD%B2%EF%BD%B0%EF%BD%BD%EF%BE%9E_w-300x274.jpg',
-        description: 'Alle großen Gashapon-Fachzentren in Japan (#C-pla Flagships, Gacha-Gacha no Mori, Akihabara Radio Kaikan, Nakano Broadway) auf einer interaktiven Karte.',
-        availability_status: 'HUBS_AVAILABLE'
-      });
-    });
-  }
-
   // Help Modal Handlers
   btnHelp.addEventListener('click', (e) => {
     e.preventDefault();
@@ -644,14 +213,8 @@ function setupEventListeners() {
       closeShopModal();
       closeFavoritesModal();
       helpModal.style.display = 'none';
-      if (settingsModal) settingsModal.style.display = 'none';
     }
   });
-}
-
-function setActiveNavBtn(btn) {
-  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
 }
 
 
@@ -674,7 +237,6 @@ function loadFavoritesFromStorage() {
   }
 
   updateFavCounters();
-  renderSavedSearchesBar();
 }
 
 function saveFavoritesToStorage() {
@@ -685,7 +247,6 @@ function saveFavoritesToStorage() {
     console.warn('Could not save favorites to localStorage:', e);
   }
   updateFavCounters();
-  renderSavedSearchesBar();
 }
 
 function updateFavCounters() {
@@ -695,48 +256,6 @@ function updateFavCounters() {
   if (favCounterBadge) favCounterBadge.textContent = itemCount;
   if (tabCountItems) tabCountItems.textContent = itemCount;
   if (tabCountSearches) tabCountSearches.textContent = searchCount;
-  if (mNavFavBadge) mNavFavBadge.textContent = itemCount;
-  if (mNavSavedBadge) {
-    mNavSavedBadge.textContent = searchCount;
-    mNavSavedBadge.style.display = searchCount > 0 ? 'flex' : 'none';
-  }
-}
-
-// ---------------------------------------------------------
-// Saved Searches Bar (Direct Access on Main Page)
-// ---------------------------------------------------------
-function renderSavedSearchesBar() {
-  if (!savedSearchesBar || !savedSearchesChips) return;
-  const searches = state.favorites.searches || [];
-
-  if (searches.length === 0) {
-    savedSearchesBar.style.display = 'none';
-    savedSearchesChips.innerHTML = '';
-    return;
-  }
-
-  savedSearchesBar.style.display = 'flex';
-  savedSearchesChips.innerHTML = searches.map((query) => `
-    <div class="saved-search-pill" data-query="${escapeHtml(query)}">
-      <span class="pill-text">🔍 ${escapeHtml(query)}</span>
-      <button type="button" class="btn-del-pill" title="Aus gemerkten Suchen entfernen" data-query="${escapeHtml(query)}">✕</button>
-    </div>
-  `).join('');
-
-  savedSearchesChips.querySelectorAll('.saved-search-pill').forEach((pill) => {
-    pill.querySelector('.pill-text').addEventListener('click', () => {
-      const q = pill.dataset.query;
-      searchInput.value = q;
-      btnClear.style.display = 'flex';
-      executeSearch(q);
-      window.scrollTo({ top: searchForm.offsetTop - 15, behavior: 'smooth' });
-    });
-
-    pill.querySelector('.btn-del-pill').addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeSearchFavorite(pill.dataset.query);
-    });
-  });
 }
 
 function isItemFavorited(id) {
@@ -751,6 +270,7 @@ function toggleFavoriteItem(item) {
   if (existsIndex >= 0) {
     state.favorites.items.splice(existsIndex, 1);
   } else {
+    // Add item with essential metadata
     state.favorites.items.unshift({
       id: item.id,
       maker: item.maker,
@@ -864,6 +384,7 @@ function renderFavoritesContent() {
       const imgSrc = item.image_url || fallbackImg;
 
       const isKitan = (item.maker || '').toLowerCase().includes('kitan');
+      const isIsland = (item.maker || '').toLowerCase().includes('island') && !item.jan_code;
 
       card.innerHTML = `
         <div class="fav-thumb-wrap">
@@ -876,17 +397,22 @@ function renderFavoritesContent() {
           <div class="fav-actions">
             ${isKitan 
               ? `<a href="${item.detail_url || '#'}" target="_blank" rel="noopener" class="btn-fav-check" style="text-align:center;text-decoration:none;display:block;">🔗 Auf Kitan Club ↗</a>`
-              : `<button type="button" class="btn-fav-check btn-find-shops-fav">🏬 Standorte & Karte</button>`
+              : (isIsland
+                ? `<a href="${item.detail_url || '#'}" target="_blank" rel="noopener" class="btn-fav-check" style="text-align:center;text-decoration:none;display:block;">🏝️ Auf Gacha-Island ↗</a>`
+                : `<button type="button" class="btn-fav-check btn-find-shops-fav">🏬 Standorte & Bestand</button>`)
             }
           </div>
         </div>
       `;
 
-      card.querySelector('.btn-fav-remove').addEventListener('click', (e) => {
+      // Remove button handler
+      const btnRemove = card.querySelector('.btn-fav-remove');
+      btnRemove.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleFavoriteItem(item);
       });
 
+      // Shop Check button handler
       const btnCheck = card.querySelector('.btn-find-shops-fav');
       if (btnCheck) {
         btnCheck.addEventListener('click', () => {
@@ -940,20 +466,16 @@ function renderFavoritesContent() {
 // Load Prefectures
 // ---------------------------------------------------------
 async function loadPrefectures() {
-  API_BASE = getApiBaseUrl();
   try {
     const res = await fetch(`${API_BASE}/api/prefectures`);
     if (res.ok) {
       const prefs = await res.json();
       state.prefectures = prefs;
       renderPrefSelect(prefs);
-      return;
     }
   } catch (err) {
-    // Fallback
+    console.warn('Could not load prefectures:', err);
   }
-  state.prefectures = FALLBACK_PREFECTURES;
-  renderPrefSelect(FALLBACK_PREFECTURES);
 }
 
 function renderPrefSelect(prefs) {
@@ -973,24 +495,19 @@ function renderPrefSelect(prefs) {
 // ---------------------------------------------------------
 async function loadPopularGachas() {
   setLoading(true);
-  API_BASE = getApiBaseUrl();
   try {
-    const res = await fetch(`${API_BASE}/api/popular`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${API_BASE}/api/popular`);
     if (res.ok) {
       const data = await res.json();
       state.popularItems = data;
       renderPopularView();
-      return;
     }
   } catch (err) {
-    console.warn('Could not load popular from backend, using fallback catalog:', err);
+    console.error('Failed to load popular items:', err);
+    renderProducts([]);
   } finally {
     setLoading(false);
   }
-
-  // Graceful standalone fallback
-  state.popularItems = FALLBACK_ITEMS;
-  renderPopularView();
 }
 
 function renderPopularView() {
@@ -1003,7 +520,7 @@ function renderPopularView() {
 
 
 // ---------------------------------------------------------
-// Execute Search (with Multilingual Translation notice & Offline Fallback)
+// Execute Search (with Multilingual Translation notice)
 // ---------------------------------------------------------
 async function executeSearch(query) {
   state.currentQuery = query;
@@ -1015,45 +532,33 @@ async function executeSearch(query) {
   resultsHeading.textContent = `Suchergebnisse für "${query}"`;
   btnResetToPopular.style.display = 'inline-block';
 
-  API_BASE = getApiBaseUrl();
   try {
     const url = `${API_BASE}/api/search?q=${encodeURIComponent(query)}&maker=${state.currentMaker}&limit=35`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (res.ok) {
-      const data = await res.json();
-      state.currentResults = data.results || [];
-      resultsCount.textContent = `${state.currentResults.length} Treffer`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
 
-      if (data.translated_from) {
-        translationNotice.innerHTML = `💡 Begriff erkannt: <strong>"${escapeHtml(data.translated_from)}"</strong> → Japanische Gachapon-Datenbanken nach <strong>"${escapeHtml(data.query)}"</strong> durchsucht.`;
-        translationNotice.style.display = 'block';
-      }
+    const data = await res.json();
+    state.currentResults = data.results || [];
+    resultsCount.textContent = `${state.currentResults.length} Treffer`;
 
-      if (state.currentResults.length === 0) {
-        emptyState.style.display = 'block';
-      } else {
-        renderProducts(state.currentResults);
-      }
-      return;
+    // Multilingual translation notice
+    if (data.translated_from) {
+      translationNotice.innerHTML = `💡 Begriff erkannt: <strong>"${escapeHtml(data.translated_from)}"</strong> → Japanische Gachapon-Datenbanken nach <strong>"${escapeHtml(data.query)}"</strong> durchsucht.`;
+      translationNotice.style.display = 'block';
+    }
+
+    if (state.currentResults.length === 0) {
+      emptyState.style.display = 'block';
+    } else {
+      renderProducts(state.currentResults);
     }
   } catch (err) {
-    console.warn('Live search unreachable, executing offline/demo matching:', err);
+    console.error('Search failed:', err);
+    emptyState.style.display = 'block';
+    resultsCount.textContent = '0 Treffer';
   } finally {
     setLoading(false);
   }
-
-  // Offline / Standalone Demo Search Fallback
-  const qLower = query.toLowerCase();
-  const matched = FALLBACK_ITEMS.filter(it => {
-    const t = (it.title || '').toLowerCase();
-    const d = (it.description || '').toLowerCase();
-    const m = (it.maker || '').toLowerCase();
-    return t.includes(qLower) || d.includes(qLower) || m.includes(qLower) || qLower.includes('apotheke') || qLower.includes('soft') || qLower.includes('fairy') || qLower.includes('hamster') || qLower.includes('frieren');
-  });
-
-  state.currentResults = matched.length > 0 ? matched : FALLBACK_ITEMS;
-  resultsCount.textContent = `${state.currentResults.length} Treffer (Demo-Katalog)`;
-  renderProducts(state.currentResults);
 }
 
 function setLoading(isLoading) {
@@ -1068,30 +573,25 @@ function setLoading(isLoading) {
 
 
 // ---------------------------------------------------------
-// Helper: Card Availability Status Badge (Accurate & Synced)
+// Helper: Card Availability Status Badge
 // ---------------------------------------------------------
-function getStatusBadgeHtml(status, totalShops = null) {
+function getStatusBadgeHtml(status) {
   switch (status) {
     case 'IN_STOCK':
-      const shopTxt = (totalShops !== null && totalShops > 0) ? `Auf Lager (${totalShops})` : 'Auf Lager';
-      return `<div class="card-status-badge status-in-stock"><span>🟢</span> <span>${shopTxt}</span></div>`;
-    case 'HUBS_AVAILABLE':
-      return `<div class="card-status-badge status-hubs"><span>🏬</span> <span>An Fachzentren</span></div>`;
-    case 'RELEASED':
-      return `<div class="card-status-badge status-released"><span>🏬</span> <span>Im Handel (Bestand prüfen)</span></div>`;
+      return `<div class="card-status-badge status-in-stock"><span>🟢</span> <span>Auf Lager</span></div>`;
     case 'UPCOMING':
       return `<div class="card-status-badge status-upcoming"><span>⏳</span> <span>Vorankündigung</span></div>`;
     case 'ARCHIVED':
       return `<div class="card-status-badge status-archived"><span>📦</span> <span>Archiv / Vintage</span></div>`;
     case 'OUT_OF_STOCK':
     default:
-      return `<div class="card-status-badge status-out-of-stock"><span>🔴</span> <span>Vergriffen (0 Standorte)</span></div>`;
+      return `<div class="card-status-badge status-out-of-stock"><span>🔴</span> <span>Vergriffen</span></div>`;
   }
 }
 
 
 // ---------------------------------------------------------
-// Render Product Cards (Prominent Release Dates & Multi-Source Badges)
+// Render Product Cards (with Prominent Release Dates & Multi-Source Badges)
 // ---------------------------------------------------------
 function renderProducts(items) {
   productGrid.innerHTML = '';
@@ -1115,7 +615,7 @@ function renderProducts(items) {
     const releaseText = item.release_date ? `📅 Release: ${escapeHtml(item.release_date)}` : '📅 Release: Aktuell';
 
     const isKitan = mLower.includes('kitan');
-    const isIslandOrIndie = mLower.includes('island') || isKitan || !item.jan_code;
+    const isIslandOnly = mLower.includes('island') && !item.jan_code;
 
     // Render other sources pills if available
     let sourcesPillsHtml = '';
@@ -1160,11 +660,13 @@ function renderProducts(items) {
           ${item.jan_code ? `<span class="card-jan" title="JAN Barcode">JAN: ${escapeHtml(item.jan_code)}</span>` : ''}
         </div>
         <div class="card-actions">
-          <button type="button" class="btn-find-shops ${isIslandOrIndie ? 'btn-hubs' : ''}" data-id="${escapeHtml(item.id)}">
-            ${isIslandOrIndie ? '🏬 Gacha-Hubs & Karte' : '🏬 Standorte & Bestand'}
-          </button>
-          ${item.detail_url && isIslandOrIndie ? `<a href="${escapeHtml(item.detail_url)}" target="_blank" rel="noopener" class="btn-source-link">🏝️ Auf Gacha-Island ansehen ↗</a>` : ''}
-          ${item.detail_url && !isIslandOrIndie ? `<a href="${escapeHtml(item.detail_url)}" target="_blank" rel="noopener" class="btn-source-link">Offizielle Seite ↗</a>` : ''}
+          ${isKitan 
+            ? `<a href="${item.detail_url || '#'}" target="_blank" rel="noopener" class="btn-source-link">🔗 Auf Kitan Club ansehen ↗</a>`
+            : (isIslandOnly
+              ? `<a href="${item.detail_url || '#'}" target="_blank" rel="noopener" class="btn-source-link">🏝️ Auf Gacha-Island ansehen ↗</a>`
+              : `<button type="button" class="btn-find-shops" data-id="${escapeHtml(item.id)}">🏬 Standorte & Bestand</button>`)
+          }
+          ${item.detail_url && !isKitan && !isIslandOnly ? `<a href="${escapeHtml(item.detail_url)}" target="_blank" rel="noopener" class="btn-source-link">Offizielle Seite ↗</a>` : ''}
           ${extraLinksHtml}
         </div>
       </div>
@@ -1260,77 +762,50 @@ async function fetchShopsForActiveProduct() {
   if (countBadgeMap) countBadgeMap.textContent = '...';
   if (countBadgeList) countBadgeList.textContent = '...';
 
-  const mLower = (product.maker || '').toLowerCase();
-  let makerParam = 'bandai';
-  if (mLower.includes('tomy')) {
-    makerParam = 'takaratomy';
-  } else if (mLower.includes('island') || mLower.includes('kitan') || !product.jan_code) {
-    makerParam = 'island';
-  }
-
+  const makerParam = product.maker.toLowerCase().includes('bandai') ? 'bandai' : 'takaratomy';
   const janParam = product.jan_code || '';
   const itemIdParam = product.id || '';
 
-  API_BASE = getApiBaseUrl();
+  // Query All Japan (pref='') to populate nationwide pins
   let queryUrl = `${API_BASE}/api/shops?maker=${makerParam}&pref=`;
   if (janParam) queryUrl += `&jan_code=${encodeURIComponent(janParam)}`;
   if (itemIdParam) queryUrl += `&item_id=${encodeURIComponent(itemIdParam)}`;
   if (product.title) queryUrl += `&product_name=${encodeURIComponent(product.title)}`;
 
   try {
-    const res = await fetch(queryUrl, { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(queryUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
     state.allShops = data.shops || [];
-    state.regionCache[''] = state.allShops;
+    state.regionCache[''] = state.allShops; // Cache All Japan results
     state.filteredShops = [...state.allShops];
 
+    // Update release date & last checked timestamp
     if (data.release_date) {
       modalReleaseDate.textContent = `📅 Release: ${data.release_date}`;
     }
     modalLastChecked.textContent = `🕒 Bestandsdaten: ${data.last_data_check}`;
 
-    // Sync live availability status back to product object and card badge!
-    product.availability_status = data.availability_status;
-    const cardEl = document.querySelector(`.product-card [data-id="${CSS.escape(product.id)}"]`)?.closest('.product-card');
-    if (cardEl) {
-      const badgeEl = cardEl.querySelector('.card-status-badge');
-      if (badgeEl) {
-        badgeEl.outerHTML = getStatusBadgeHtml(data.availability_status, data.total_shops);
-      }
-    }
-
+    // Update Status Banner
     renderStatusBanner(data);
+
+    // Update Collector Box if out of stock or vintage
     renderCollectorBox(data);
+
+    // Render shops
     renderShopsUI(state.filteredShops);
-    return;
   } catch (err) {
-    console.warn('Live shop query unavailable, falling back to hubs/offline data:', err);
+    console.error('Failed to fetch shops:', err);
+    shopCountText.textContent = 'Keine Bestandsdaten von der Hersteller-API gemeldet.';
+    if (countBadgeMap) countBadgeMap.textContent = '0';
+    if (countBadgeList) countBadgeList.textContent = '0';
+    modalStatusBanner.innerHTML = `⚠️ Keine Live-Standorte gemeldet (Siehe Sammler-Tipps unten)`;
+    modalStatusBanner.className = 'modal-status-banner status-out-of-stock';
+    modalStatusBanner.style.display = 'flex';
   } finally {
     shopLoading.style.display = 'none';
   }
-
-  // Offline / GitHub Pages fallback
-  state.allShops = FALLBACK_HUBS;
-  state.regionCache[''] = state.allShops;
-  state.filteredShops = [...state.allShops];
-
-  const fallbackData = {
-    availability_status: 'HUBS_AVAILABLE',
-    status_label: `🏬 An Fachzentren verfügbar (${FALLBACK_HUBS.length} Mega-Stores gelistet)`,
-    status_advice: 'Artikel dieses Herstellers sind zuverlässig in den großen Gacha-Mega-Zentren (#C-pla Flagships, Gacha-Gacha no Mori, Akihabara Radio Kaikan) vor Ort zu finden.',
-    collector_links: {
-      "Gacha-Island Review": "https://gacha-island.jp/",
-      "Akihabara Gacha District": "https://www.google.com/maps/search/?api=1&query=Akihabara+Radio+Kaikan+Tokyo"
-    }
-  };
-
-  modalReleaseDate.textContent = product.release_date ? `📅 Release: ${product.release_date}` : '📅 Release: Aktuell';
-  modalLastChecked.textContent = '🕒 Bestandsdaten: Tagesaktuell im Hub';
-  renderStatusBanner(fallbackData);
-  renderCollectorBox(fallbackData);
-  renderShopsUI(state.filteredShops);
 }
 
 function renderStatusBanner(data) {
@@ -1341,9 +816,6 @@ function renderStatusBanner(data) {
   if (data.availability_status === 'OUT_OF_STOCK') {
     bannerClass = 'status-out-of-stock';
     icon = '🔴';
-  } else if (data.availability_status === 'HUBS_AVAILABLE') {
-    bannerClass = 'status-hubs';
-    icon = '🏬';
   } else if (data.availability_status === 'UPCOMING') {
     bannerClass = 'status-upcoming';
     icon = '⏳';
@@ -1360,7 +832,7 @@ function renderStatusBanner(data) {
 }
 
 function renderCollectorBox(data) {
-  if (data.availability_status === 'IN_STOCK' || data.availability_status === 'HUBS_AVAILABLE') {
+  if (data.availability_status === 'IN_STOCK') {
     modalCollectorBox.style.display = 'none';
     return;
   }
@@ -1392,26 +864,22 @@ async function handlePrefectureFilterChange() {
   if (!state.activeProduct) return;
 
   if (!prefCode) {
+    // Ganz Japan: instant lookup from All-Japan cache
     state.filteredShops = state.regionCache[''] || state.allShops;
     renderShopsUI(state.filteredShops);
     return;
   }
 
+  // If already in region cache, instant 0ms display!
   if (state.regionCache[prefCode]) {
     state.filteredShops = state.regionCache[prefCode];
     renderShopsUI(state.filteredShops);
     return;
   }
 
+  // Not yet cached for this region: fetch from backend with pref parameter
   const product = state.activeProduct;
-  const mLower = (product.maker || '').toLowerCase();
-  let makerParam = 'bandai';
-  if (mLower.includes('tomy')) {
-    makerParam = 'takaratomy';
-  } else if (mLower.includes('island') || mLower.includes('kitan') || !product.jan_code) {
-    makerParam = 'island';
-  }
-
+  const makerParam = product.maker.toLowerCase().includes('bandai') ? 'bandai' : 'takaratomy';
   const janParam = product.jan_code || '';
   const itemIdParam = product.id || '';
 
@@ -1421,101 +889,74 @@ async function handlePrefectureFilterChange() {
   shopLoading.style.display = 'block';
   shopCountText.textContent = `Standorte für ${prefLabel} werden in Echtzeit abgefragt...`;
 
-  API_BASE = getApiBaseUrl();
   let queryUrl = `${API_BASE}/api/shops?maker=${makerParam}&pref=${encodeURIComponent(prefCode)}`;
   if (janParam) queryUrl += `&jan_code=${encodeURIComponent(janParam)}`;
   if (itemIdParam) queryUrl += `&item_id=${encodeURIComponent(itemIdParam)}`;
   if (product.title) queryUrl += `&product_name=${encodeURIComponent(product.title)}`;
 
   try {
-    const res = await fetch(queryUrl, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(queryUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
     const shops = data.shops || [];
 
+    // Save in region cache
     state.regionCache[prefCode] = shops;
+
+    // Only update view if user is still on this prefecture
     if (state.currentPref === prefCode) {
       state.filteredShops = shops;
       renderShopsUI(state.filteredShops);
     }
-    return;
   } catch (err) {
-    console.warn('Regional fetch fallback to local filter:', err);
+    console.warn('Regional fetch failed, falling back to local filter:', err);
+    // Fallback: local filter on allShops
+    const prefName = opt ? (opt.dataset.name || '') : '';
+    state.filteredShops = state.allShops.filter((s) => {
+      if (s.prefecture && prefName && s.prefecture.includes(prefName)) return true;
+      if (s.address && prefName && s.address.includes(prefName)) return true;
+      return false;
+    });
+    renderShopsUI(state.filteredShops);
   } finally {
     shopLoading.style.display = 'none';
   }
-
-  // Local filter fallback
-  const prefName = opt ? (opt.dataset.name || '') : '';
-  state.filteredShops = state.allShops.filter((s) => {
-    if (s.pref_code && String(s.pref_code) === String(prefCode)) return true;
-    if (s.prefecture && prefName && s.prefecture.includes(prefName)) return true;
-    if (s.address && prefName && s.address.includes(prefName)) return true;
-    return false;
-  });
-  renderShopsUI(state.filteredShops);
 }
 
 
 // ---------------------------------------------------------
-// Switch Map / List View
-// ---------------------------------------------------------
-function switchShopView(view) {
-  state.currentView = view;
-
-  if (view === 'map') {
-    btnViewMap.classList.add('active');
-    btnViewList.classList.remove('active');
-    shopMapContainer.style.display = 'block';
-    shopListContainer.style.display = 'none';
-
-    setTimeout(() => {
-      initMapIfNeeded();
-      if (state.map) {
-        state.map.invalidateSize();
-        renderMapMarkers(state.filteredShops);
-      }
-    }, 100);
-  } else {
-    btnViewList.classList.add('active');
-    btnViewMap.classList.remove('active');
-    shopListContainer.style.display = 'block';
-    shopMapContainer.style.display = 'none';
-  }
-}
-
-
-// ---------------------------------------------------------
-// Render Shops UI (Count synchronizer across top bar and views)
+// Render Shops UI (List + Map)
 // ---------------------------------------------------------
 function renderShopsUI(shops) {
-  const count = shops.length;
-  const opt = prefSelect.querySelector(`option[value="${state.currentPref}"]`);
-  const regionName = opt ? opt.textContent : 'Japan';
-
-  shopCountText.textContent = count > 0 
-    ? `${count} Standorte in ${regionName} gefunden`
-    : `Keine Standorte für ${regionName} gemeldet`;
-
-  if (countBadgeMap) countBadgeMap.textContent = count;
-  if (countBadgeList) countBadgeList.textContent = count;
+  const regionLabel = state.currentPref ? 'in dieser Region' : 'in ganz Japan';
+  if (shopCountText) {
+    shopCountText.textContent = shops.length > 0
+      ? `🏬 ${shops.length} Verkaufsstellen ${regionLabel} gemeldet`
+      : `Keine direkten Automaten ${regionLabel} gemeldet`;
+  }
+  if (countBadgeMap) countBadgeMap.textContent = shops.length;
+  if (countBadgeList) countBadgeList.textContent = shops.length;
 
   renderShopList(shops);
+  updateMapMarkers(shops);
 
-  if (state.currentView === 'map' && state.map) {
-    renderMapMarkers(shops);
-  }
+  // Invalidate Leaflet size safely after rendering
+  setTimeout(() => {
+    if (state.map) state.map.invalidateSize();
+  }, 100);
 }
 
 function renderShopList(shops) {
   shopList.innerHTML = '';
+  const regionLabel = state.currentPref ? 'in dieser Region' : 'in ganz Japan';
+
   if (shops.length === 0) {
     shopList.innerHTML = `
-      <div style="text-align: center; padding: 30px; color: #64748b;">
-        <div style="font-size: 2rem; margin-bottom: 8px;">📍</div>
-        <p>In dieser Region wurden aktuell keine Verkaufsstellen gemeldet.</p>
-        <small>Wähle oben "Ganz Japan", um alle Standorte im Land zu durchsuchen.</small>
+      <div style="text-align: center; padding: 28px 16px; color: #57606f;">
+        <p style="font-size: 2rem; margin-bottom: 6px;">🏬</p>
+        <p><strong>Keine direkten Automaten ${regionLabel} gemeldet.</strong></p>
+        <small>Tipp: Wähle oben "Ganz Japan" oder prüfe die Sammler-Tipps unter der Karte.</small>
       </div>
     `;
     return;
@@ -1525,24 +966,20 @@ function renderShopList(shops) {
     const card = document.createElement('div');
     card.className = 'shop-card';
 
-    const distStr = s.distance_meters != null
-      ? (s.distance_meters >= 1000 ? `${(s.distance_meters / 1000).toFixed(1)} km` : `${s.distance_meters} m`)
-      : null;
-
     card.innerHTML = `
       <div class="shop-info">
-        <h5 class="shop-name">${escapeHtml(s.shop_name)}</h5>
-        <p class="shop-address">📍 ${escapeHtml(s.address)}</p>
-        ${s.phone ? `<p class="shop-phone">📞 ${escapeHtml(s.phone)}</p>` : ''}
-        <div class="shop-meta-row">
-          <span class="shop-status">● ${escapeHtml(s.stock_status || 'Auf Lager')}</span>
-          ${distStr ? `<span class="shop-dist">Distanz: ${distStr}</span>` : ''}
-          ${s.last_updated ? `<span style="font-size: 0.7rem; color: #94a3b8;">(${escapeHtml(s.last_updated)})</span>` : ''}
+        <div class="shop-header-row">
+          ${s.prefecture ? `<span class="shop-pref-pill">${escapeHtml(s.prefecture)}</span>` : ''}
+          <span class="shop-status-badge">● ${escapeHtml(s.stock_status)}</span>
         </div>
+        <div class="shop-name">${escapeHtml(s.shop_name)}</div>
+        <div class="shop-address">📍 ${escapeHtml(s.address)}</div>
+        ${s.phone ? `<div style="font-size:0.78rem;color:#747d8c;margin-top:2px;">📞 ${escapeHtml(s.phone)}</div>` : ''}
+        ${s.distance_meters ? `<div class="shop-distance">Entfernung: ca. ${(s.distance_meters / 1000).toFixed(1)} km</div>` : ''}
       </div>
-      <div class="shop-action">
+      <div class="shop-actions">
         <a href="${escapeHtml(s.google_maps_url)}" target="_blank" rel="noopener" class="btn-gmaps">
-          🗺️ Google Maps Navigation ↗
+          <span>Google Maps</span> ↗
         </a>
       </div>
     `;
@@ -1553,36 +990,64 @@ function renderShopList(shops) {
 
 
 // ---------------------------------------------------------
-// Leaflet Map Initialization & Rendering
+// View Switcher (Map default, List on demand)
 // ---------------------------------------------------------
-function initMapIfNeeded() {
-  if (state.map) return;
-
-  const mapEl = document.getElementById('map');
-  if (!mapEl) return;
-
-  // Center on Tokyo / Japan
-  state.map = L.map('map', {
-    zoomControl: true,
-    scrollWheelZoom: true,
-    tap: !L.Browser.mobile
-  }).setView([36.2048, 138.2529], 5);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  }).addTo(state.map);
-
-  state.markersLayer = L.layerGroup().addTo(state.map);
+function switchShopView(view) {
+  state.currentView = view;
+  if (view === 'map') {
+    btnViewMap.classList.add('active');
+    btnViewList.classList.remove('active');
+    shopMapContainer.style.display = 'block';
+    shopListContainer.style.display = 'none';
+    initMapIfNeeded();
+  } else {
+    btnViewList.classList.add('active');
+    btnViewMap.classList.remove('active');
+    shopListContainer.style.display = 'block';
+    shopMapContainer.style.display = 'none';
+  }
 }
 
-function renderMapMarkers(shops) {
+
+// ---------------------------------------------------------
+// Leaflet Map Integration (Japan Nationwide)
+// ---------------------------------------------------------
+function initMapIfNeeded() {
+  if (!state.map) {
+    if (typeof L === 'undefined') {
+      console.warn('Leaflet not loaded');
+      return;
+    }
+
+    // Centered on the center of Japan [36.2048, 138.2529] with nationwide zoom level
+    state.map = L.map('shopMap').setView([36.2048, 138.2529], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(state.map);
+
+    state.markersLayer = L.layerGroup().addTo(state.map);
+  }
+
+  // Redraw map and bounds on display
+  setTimeout(() => {
+    if (state.map) {
+      state.map.invalidateSize();
+      updateMapMarkers(state.filteredShops);
+    }
+  }, 100);
+}
+
+function updateMapMarkers(shops) {
   if (!state.map || !state.markersLayer) return;
 
   state.markersLayer.clearLayers();
 
-  const validShops = shops.filter((s) => s.latitude != null && s.longitude != null);
+  const validShops = shops.filter((s) => s.latitude && s.longitude);
+
   if (validShops.length === 0) {
+    // Reset view to Japan nationwide
     state.map.setView([36.2048, 138.2529], 5);
     return;
   }
@@ -1593,8 +1058,8 @@ function renderMapMarkers(shops) {
     className: 'custom-capsule-marker',
     html: `
       <div style="
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
         background: #ff4757;
         border: 2.5px solid #2f3542;
         border-radius: 50%;
@@ -1604,14 +1069,14 @@ function renderMapMarkers(shops) {
         box-shadow: 0 4px 10px rgba(0,0,0,0.35);
         color: white;
         font-size: 15px;
-        transform: translate(-16px, -16px);
+        transform: translate(-15px, -15px);
       ">
         🔴
       </div>
     `,
-    iconSize: [32, 32],
+    iconSize: [30, 30],
     iconAnchor: [0, 0],
-    popupAnchor: [0, -16]
+    popupAnchor: [0, -15]
   });
 
   validShops.forEach((s) => {
@@ -1624,9 +1089,9 @@ function renderMapMarkers(shops) {
       <div style="font-family: 'Outfit', sans-serif; font-size: 13px; max-width: 250px; padding: 4px;">
         <strong style="color: #1e272e; font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(s.shop_name)}</strong>
         <p style="color: #57606f; margin: 0 0 6px;">📍 ${escapeHtml(s.address)}</p>
-        <span style="display:inline-block; font-size: 11px; font-weight: bold; color: #10ac84; background: #e8faf0; padding: 2px 6px; border-radius: 4px; margin-bottom: 8px;">● ${escapeHtml(s.stock_status || 'Auf Lager')}</span>
+        <span style="display:inline-block; font-size: 11px; font-weight: bold; color: #10ac84; background: #e8faf0; padding: 2px 6px; border-radius: 4px; margin-bottom: 8px;">● ${escapeHtml(s.stock_status)}</span>
         <div>
-          <a href="${escapeHtml(s.google_maps_url)}" target="_blank" rel="noopener" style="display: block; text-align: center; background: #2f3542; color: #fff; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 12px;">Google Maps Navigation ↗</a>
+          <a href="${escapeHtml(s.google_maps_url)}" target="_blank" rel="noopener" style="display: block; text-align: center; background: #2f3542; color: #fff; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 12px;">Google Maps Route ↗</a>
         </div>
       </div>
     `;
@@ -1635,6 +1100,7 @@ function renderMapMarkers(shops) {
     state.markersLayer.addLayer(marker);
   });
 
+  // Fit bounds to show all shops across Japan or prefecture
   if (latLngs.length > 0) {
     if (latLngs.length === 1) {
       state.map.setView(latLngs[0], 14);

@@ -1,34 +1,10 @@
-# 🇯🇵 GachaFinder Japan (ガチャファインダー) v2.7
+# 🇯🇵 GachaFinder Japan (ガチャファインダー) v2.5
 
-Ein moderner **Gacha / Capsule Toy Finder** für Japan. Die Anwendung ermöglicht es, nach beliebten Gachapon-Artikeln von führenden Herstellern (**Bandai**, **Takara Tomy Arts**, **Kitan Club**, **Toys Spirits**, **Qualia**, **Ultra New Planning**) sowie Partnerplattformen (**Gacha-Island**, **GachaNavi**) zu suchen und deren **Lagerbestand und Verkaufsstellen in ganz Japan** in einer aufgeräumten Liste sowie auf einer **interaktiven Karte** anzuzeigen.
+Ein moderner **Gacha / Capsule Toy Finder** für Japan. Die Anwendung ermöglicht es, nach beliebten Gachapon-Artikeln von führenden Herstellern (**Bandai**, **Takara Tomy Arts**, **Kitan Club**) sowie Partnerplattformen (**Gacha-Island**, **GachaNavi**) zu suchen und deren **Lagerbestand und Verkaufsstellen in ganz Japan** in einer aufgeräumten Liste sowie auf einer **interaktiven Karte** anzuzeigen.
 
 ---
 
-## 🌟 Neue Features & Meilensteine in Version 2.7
-
-- 🚀 **GitHub Pages Hosting & Offline / Demo-Modus:**
-  - Die App kann direkt über **GitHub Pages** gehostet werden (`.github/workflows/deploy-pages.yml` und `docs/`-Ordner bereitgestellt).
-  - Funktioniert nahtlos sowohl mit lokalem Python-Backend als auch rein statisch mit integriertem Fallback-Katalog und Mega-Stores-Karte.
-  - Über den Server-Status-Button im Header (`🟢 Online` / `🟡 GitHub Pages Modus`) kann bei Bedarf eine eigene gehostete Backend-URL (z. B. auf Render oder Railway) hinterlegt werden.
-- 📱 **Mobile-First Daumen-Navigation:**
-  - Feste untere Navigationsleiste für Smartphones: `🔍 Suche`, `⭐ Gemerkt`, `❤️ Favoriten` und `🗺️ Mega-Hubs`.
-  - Optimierte Touch-Ziele, kein störender iOS-Doppelklick-Zoom, Safe-Area-Insets für iPhone/Android.
-- ⭐ **Direkte „Gemerkte Suchen“-Leiste:**
-  - Gespeicherte Suchbegriffe erscheinen nun direkt unter der Suchleiste als klickbare Chips mit 1-Klick-Löschfunktion (`✕`) und „Alle leeren“.
-- 🎯 **Bestands-Bugfix (Kachel vs. Karte synchronisiert):**
-  - Keine falschen „🟢 Auf Lager“-Anzeigen mehr vor der Bestandsprüfung.
-  - Sobald eine Kapsel aufgerufen wird, aktualisiert sich der Status-Badge auf der Kachel in Echtzeit auf das reale Ergebnis (`🟢 Auf Lager (XX Standorte)` oder `🔴 Vergriffen (0 Standorte)`).
-- 🏬 **Gacha-Island & Indie-Makers Karten-Integration (24+ Mega-Hubs):**
-  - Artikel von unabhängigen Herstellern (Ultra New Planning, Toys Spirits, Qualia, Kitan Club) besitzen keine einzelnen Maschinensensoren.
-  - **Neu:** Sie verfügen jetzt über einen dedizierten `🏬 Gacha-Hubs & Karte`-Button, der die 24 großen Gashapon-Flagship-Stores in ganz Japan (Tokyo Sunshine City, Shibuya Center-gai, Akihabara Radio Kaikan, Osaka Shinsaibashi etc.) mit Adressen, Distanz und Google Maps-Routing anzeigt.
-- 🍧 **Neue Suchbegriffe & Franchises:**
-  - `The Convenience Store Soft Serve Mejirushi Charm` ➔ `ざ・コンビニソフトめじるしチャーム` (Toys Spirits)
-  - `vegtebale fairys` / `vegetable fairies` ➔ `おやさい妖精さん` (Qualia / Stand Stones)
-  - `pins` ➔ `ピンズ` / `ピンバッジ`
-  - `essen` ➔ `食べ物` / `フード`
-  - `eiscreme` ➔ `アイス` / `ソフトクリーム`
-  - `süßigkeiten` ➔ `お菓子` / `スイーツ`
-  - `parfaits` ➔ `パフェ`
+## 🌟 Neue Features in Version 2.5
 
 - 🟢 **Verfügbarkeits-Status direkt in der Such-Übersicht:**
   - Jede Gacha-Karte zeigt sofort ihren Verfügbarkeits-Status an:

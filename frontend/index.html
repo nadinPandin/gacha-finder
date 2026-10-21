@@ -2,10 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GachaFinder Japan 🇯🇵 | ガチャファインダー</title>
   <meta name="description" content="Finde Gachapon & Capsule Toys in Japan (Bandai, Takara Tomy Arts, Kitan Club, Gacha-Island). Suche auf Deutsch, Englisch oder Japanisch nach JAN-Code oder Namen und prüfe Shop-Verfügbarkeiten auf der interaktiven Japan-Karte!">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%23ff4b5c'/><path d='M2,50 A48,48 0 0,1 98,50 Z' fill='%23ffffff'/><circle cx='50' cy='50' r='14' fill='%23ffffff' stroke='%23333333' stroke-width='6'/><circle cx='50' cy='50' r='6' fill='%23ff4b5c'/><line x1='2' y1='50' x2='36' y2='50' stroke='%23333333' stroke-width='6'/><line x1='64' y1='50' x2='98' y2='50' stroke='%23333333' stroke-width='6'/><circle cx='50' cy='50' r='48' fill='none' stroke='%23333333' stroke-width='6'/></svg>">
@@ -36,12 +33,6 @@
         </div>
       </div>
       <div class="header-actions">
-        <!-- Backend Status Pill (GitHub Pages & Live Indicator) -->
-        <button type="button" class="btn-server-status" id="btnServerStatus" title="Server-Status & Backend-Einstellungen">
-          <span class="status-indicator-dot online"></span>
-          <span class="server-status-text" id="serverStatusText">Online</span>
-        </button>
-
         <!-- Favorites Button in Header -->
         <button type="button" class="btn-fav-header" id="btnOpenFavorites" title="Gemerkte Gachas & Favoriten">
           <span class="fav-icon">❤️</span>
@@ -49,7 +40,8 @@
           <span id="favCounterBadge" class="fav-badge">0</span>
         </button>
 
-        <a href="#help" class="info-link" id="btnHelp" title="Hilfe & Quellen">ℹ️ Info</a>
+        <span class="live-badge"><span class="pulse-dot"></span> Live Scraper</span>
+        <a href="#help" class="info-link" id="btnHelp" title="Hilfe & Quellen">ℹ️ Hilfe</a>
       </div>
     </div>
   </header>
@@ -86,13 +78,6 @@
         </button>
       </form>
 
-      <!-- Saved Searches Bar (Direct Access on Main Page) -->
-      <div class="saved-searches-bar" id="savedSearchesBar" style="display: none;">
-        <span class="saved-searches-label">⭐ Gemerkte Suchen:</span>
-        <div class="saved-searches-chips" id="savedSearchesChips"></div>
-        <button type="button" class="btn-clear-all-searches" id="btnClearAllSearches" title="Alle gemerkten Suchen entfernen">Alle leeren</button>
-      </div>
-
       <!-- Translation Notice Banner -->
       <div class="translation-notice" id="translationNotice" style="display: none;"></div>
 
@@ -109,20 +94,17 @@
       <!-- Quick Search Suggestions -->
       <div class="quick-tags">
         <span class="quick-label">Beliebte Franchises:</span>
-        <button type="button" class="tag-chip" data-query="ざ・コンビニソフトめじるしチャーム">🍦 Soft Serve Charm</button>
-        <button type="button" class="tag-chip" data-query="おやさい妖精さん">🥬 Vegetable Fairies</button>
-        <button type="button" class="tag-chip" data-query="けみかるハムスター">🐹 Kemikaru Hamster</button>
         <button type="button" class="tag-chip" data-query="Frieren">🪄 Frieren (フリーレン)</button>
+        <button type="button" class="tag-chip" data-query="けみかるハムスター">🐹 Kemikaru Hamster (けみかる)</button>
         <button type="button" class="tag-chip" data-query="Tagebücher der Apothekerin">🧪 Apothekerin (薬屋)</button>
         <button type="button" class="tag-chip" data-query="Card Captor Sakura">🌸 Cardcaptor Sakura</button>
         <button type="button" class="tag-chip" data-query="Pokémon">⚡ Pokémon</button>
         <button type="button" class="tag-chip" data-query="Monster Hunter">🐉 Monster Hunter</button>
         <button type="button" class="tag-chip" data-query="Detektiv Conan">🔍 Detektiv Conan</button>
-        <button type="button" class="tag-chip" data-query="pins">📍 Pins & Anstecker</button>
-        <button type="button" class="tag-chip" data-query="parfaits">🍰 Parfaits & Süßes</button>
         <button type="button" class="tag-chip" data-query="Chainsaw Man">🪚 Chainsaw Man</button>
         <button type="button" class="tag-chip" data-query="One Piece">🏴‍☠️ One Piece</button>
         <button type="button" class="tag-chip" data-query="Kamera (Canon)">📷 Kamera (Canon)</button>
+        <button type="button" class="tag-chip" data-query="Madoka">🎀 Madoka Magica</button>
         <button type="button" class="tag-chip" data-query="Squishy">🍞 Squishy</button>
       </div>
     </section>
@@ -326,52 +308,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Backend Settings Modal (For GitHub Pages & Custom API) -->
-  <div class="modal-backdrop" id="settingsModal" style="display: none;">
-    <div class="modal-dialog modal-dialog-sm">
-      <div class="modal-header">
-        <h3 class="modal-title">⚙️ Server & GitHub Pages Modus</h3>
-        <button type="button" class="modal-close" id="btnCloseSettings">✕</button>
-      </div>
-      <div class="modal-body" style="padding: 16px 20px;">
-        <p style="font-size:0.85rem; color:#475569; margin-bottom:12px; line-height:1.5;">
-          Wenn diese Seite auf <strong>GitHub Pages</strong> gehostet wird, kannst du hier die URL deines Backends (z. B. auf Render, Railway oder ngrok) angeben. Ohne Backend läuft die Seite im <strong>Offline / Demo-Modus</strong> mit integriertem Katalog & Karten.
-        </p>
-        <div class="form-group" style="margin-bottom:14px;">
-          <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:6px;">Backend API-URL:</label>
-          <input type="url" id="backendUrlInput" class="search-input" placeholder="z. B. https://gacha-api.onrender.com oder http://localhost:8000" style="height:42px; font-size:0.85rem; width:100%; border:1.5px solid var(--border-color); border-radius:8px; padding:0 12px;" />
-          <small style="color:#64748b; font-size:0.75rem; display:block; margin-top:4px;">Standard: Leer lassen (verwendet denselben Origin / lokales Backend).</small>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button type="button" class="btn-submit" id="btnSaveBackendUrl" style="height:40px; font-size:0.85rem; padding:0 16px;">Speichern</button>
-          <button type="button" class="btn-secondary" id="btnResetBackendUrl" style="height:40px; font-size:0.85rem; padding:0 14px;">Zurücksetzen</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Mobile Bottom Navigation Bar (Sticky Thumb Navigation) -->
-  <nav class="mobile-bottom-nav" id="mobileBottomNav">
-    <button type="button" class="mobile-nav-btn active" id="mNavSearch">
-      <span class="m-nav-icon">🔍</span>
-      <span class="m-nav-text">Suche</span>
-    </button>
-    <button type="button" class="mobile-nav-btn" id="mNavSaved">
-      <span class="m-nav-icon">⭐</span>
-      <span class="m-nav-text">Gemerkt</span>
-      <span class="m-nav-badge" id="mNavSavedBadge" style="display:none;">0</span>
-    </button>
-    <button type="button" class="mobile-nav-btn" id="mNavFavs">
-      <span class="m-nav-icon">❤️</span>
-      <span class="m-nav-text">Favoriten</span>
-      <span class="m-nav-badge" id="mNavFavBadge">0</span>
-    </button>
-    <button type="button" class="mobile-nav-btn" id="mNavHubs">
-      <span class="m-nav-icon">🗺️</span>
-      <span class="m-nav-text">Mega-Hubs</span>
-    </button>
-  </nav>
 
   <!-- Leaflet Map JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

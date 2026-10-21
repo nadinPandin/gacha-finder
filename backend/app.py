@@ -17,7 +17,6 @@ Includes:
 import os
 import re
 import time
-import math
 import asyncio
 import urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -87,8 +86,10 @@ CACHE = TTLCache(ttl_seconds=900)
 # Multilingual Search Dictionary (Externalized to translations.py / translations.json)
 # ---------------------------------------------------------
 import sys
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+from pathlib import Path
+_BACKEND_DIR = Path(__file__).resolve().parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
 
 try:
     from translations import (
@@ -243,326 +244,12 @@ class ShopResponse(BaseModel):
     shops: List[ShopLocation]
 
 
-def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> int:
-    """Calculates haversine distance in meters between two coordinates."""
-    r = 6371000
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-    a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
-    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-    return int(r * c)
-
-
-# ---------------------------------------------------------
-# Premier Gashapon Mega-Hubs across Japan
-# (For independent makers, Gacha-Island items, and multi-brand centers)
-# ---------------------------------------------------------
-GACHA_HUBS: List[Dict[str, Any]] = [
-    # Tokyo (code 13)
-    {
-        "shop_name": "【#C-pla】Shibuya Center-gai Mega-Store (1.200+ Automaten)",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都渋谷区宇田川町23-11 渋谷センター街",
-        "postal_code": "150-0042",
-        "phone": "03-6455-2980",
-        "latitude": 35.6598,
-        "longitude": 139.6980,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6598,139.6980"
-    },
-    {
-        "shop_name": "【Gashapon no Mori】Ikebukuro Sunshine City (3.000+ Automaten - Weltgrößtes Zentrum)",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都豊島区東池袋3-1-3 サンシャインシティ ワールドインポートマートビル3F",
-        "postal_code": "170-0013",
-        "phone": "03-5953-6571",
-        "latitude": 35.7289,
-        "longitude": 139.7188,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.7289,139.7188"
-    },
-    {
-        "shop_name": "【#C-pla】Akihabara Central Street (1.000+ Automaten)",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都千代田区外神田3-16-17",
-        "postal_code": "101-0021",
-        "phone": "03-5298-5080",
-        "latitude": 35.6998,
-        "longitude": 139.7712,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6998,139.7712"
-    },
-    {
-        "shop_name": "【Akihabara Radio Kaikan】Gashapon Specialty Corner B1 & 2F",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都千代田区外神田1-15-16 秋葉原ラジオ会館",
-        "postal_code": "101-0021",
-        "phone": "03-3251-3711",
-        "latitude": 35.6980,
-        "longitude": 139.7718,
-        "stock_status": "Verfügbar / Sammler-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6980,139.7718"
-    },
-    {
-        "shop_name": "【Gashapon Official Shop】Tokyo Station Character Street",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都千代田区丸の内1-9-1 東京駅一番街 B1F",
-        "postal_code": "100-0005",
-        "phone": "03-3210-0077",
-        "latitude": 35.6812,
-        "longitude": 139.7671,
-        "stock_status": "Verfügbar / Flagship",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6812,139.7671"
-    },
-    {
-        "shop_name": "【Gacha-Gacha no Mori】Olinas Kinshicho 3F (Große Tier- & Indie-Auswahl)",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都墨田区太平4-1-2 オリナス錦糸町3F",
-        "postal_code": "130-0012",
-        "phone": "080-4114-3729",
-        "latitude": 35.7004,
-        "longitude": 139.8154,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.7004,139.8154"
-    },
-    {
-        "shop_name": "【Gashacoco】Shinjuku Subnade Shopping Underground",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都新宿区歌舞伎町1-2-2 新宿サブナード地下街",
-        "postal_code": "160-0021",
-        "phone": "03-3354-6111",
-        "latitude": 35.6925,
-        "longitude": 139.7020,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6925,139.7020"
-    },
-    {
-        "shop_name": "【Nakano Broadway】Capsule & Toy Arcade B1F",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都中野区中野5-52-15 中野ブロードウェイ",
-        "postal_code": "164-0001",
-        "phone": "03-3388-7004",
-        "latitude": 35.7089,
-        "longitude": 139.6657,
-        "stock_status": "Verfügbar / Vintage & Indie",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.7089,139.6657"
-    },
-    {
-        "shop_name": "【Capsule Lab】DiverCity Tokyo Plaza Odaiba 5F",
-        "prefecture": "東京都",
-        "pref_code": "13",
-        "address": "東京都江東区青海1-1-10 ダイバーシティ東京プラザ5F",
-        "postal_code": "135-0064",
-        "phone": "03-6380-7200",
-        "latitude": 35.6252,
-        "longitude": 139.7753,
-        "stock_status": "Verfügbar / Mega-Store",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.6252,139.7753"
-    },
-    # Osaka (code 27)
-    {
-        "shop_name": "【#C-pla】Shinsaibashi-suji Flagship Mega-Store (1.500+ Automaten)",
-        "prefecture": "大阪府",
-        "pref_code": "27",
-        "address": "大阪府大阪市中央区心斎橋筋1-6-10",
-        "postal_code": "542-0085",
-        "phone": "06-6241-1180",
-        "latitude": 34.6710,
-        "longitude": 135.5015,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=34.6710,135.5015"
-    },
-    {
-        "shop_name": "【Gacha-Gacha no Mori】Umeda HEP FIVE 4F",
-        "prefecture": "大阪府",
-        "pref_code": "27",
-        "address": "大阪府大阪市北区角田町5-15 HEP FIVE 4F",
-        "postal_code": "530-0017",
-        "phone": "06-6366-3690",
-        "latitude": 34.7037,
-        "longitude": 135.5002,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=34.7037,135.5002"
-    },
-    {
-        "shop_name": "【Nippombashi Den Den Town】Gashapon Specialty Street",
-        "prefecture": "大阪府",
-        "pref_code": "27",
-        "address": "大阪府大阪市浪速区日本橋4-15-18",
-        "postal_code": "556-0005",
-        "phone": "06-6644-1200",
-        "latitude": 34.6601,
-        "longitude": 135.5060,
-        "stock_status": "Verfügbar / Sammler-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=34.6601,135.5060"
-    },
-    {
-        "shop_name": "【Yodobashi Camera】Multimedia Umeda B2F Capsule Zone",
-        "prefecture": "大阪府",
-        "pref_code": "27",
-        "address": "大阪府大阪市北区大深町1-1 ヨドバシ梅田 B2F",
-        "postal_code": "530-0011",
-        "phone": "06-4802-1010",
-        "latitude": 34.7042,
-        "longitude": 135.4965,
-        "stock_status": "Verfügbar / Gacha-Zone",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=34.7042,135.4965"
-    },
-    # Kyoto (code 26)
-    {
-        "shop_name": "【#C-pla】Kyoto Shijo Kawaramachi Mega-Store",
-        "prefecture": "京都府",
-        "pref_code": "26",
-        "address": "京都府京都市中京区河原町通四条上る塩屋町330",
-        "postal_code": "604-8027",
-        "phone": "075-256-8810",
-        "latitude": 35.0037,
-        "longitude": 135.7698,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.0037,135.7698"
-    },
-    {
-        "shop_name": "【Gacha-Gacha no Mori】Kyoto AVANTI (JR Kyoto Stn South Exit)",
-        "prefecture": "京都府",
-        "pref_code": "26",
-        "address": "京都府京都市南区東九条西山王町31 京都アバンティ4F",
-        "postal_code": "601-8003",
-        "phone": "075-682-5031",
-        "latitude": 34.9837,
-        "longitude": 135.7592,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=34.9837,135.7592"
-    },
-    # Kanagawa / Yokohama (code 14)
-    {
-        "shop_name": "【Gashapon Official Shop】Yokohama World Porters",
-        "prefecture": "神奈川県",
-        "pref_code": "14",
-        "address": "神奈川県横浜市中区新港2-2-1 横浜ワールドポーターズ2F",
-        "postal_code": "231-0001",
-        "phone": "045-222-2000",
-        "latitude": 35.4542,
-        "longitude": 139.6420,
-        "stock_status": "Verfügbar / Flagship",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.4542,139.6420"
-    },
-    {
-        "shop_name": "【#C-pla】Yokohama Vivre",
-        "prefecture": "神奈川県",
-        "pref_code": "14",
-        "address": "神奈川県横浜市西区南幸2-15-13 横浜ビブレ4F",
-        "postal_code": "220-8577",
-        "phone": "045-314-2121",
-        "latitude": 35.4660,
-        "longitude": 139.6190,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.4660,139.6190"
-    },
-    # Aichi / Nagoya (code 23)
-    {
-        "shop_name": "【Gacha-Gacha no Mori】Nagoya Sakae Central Park",
-        "prefecture": "愛知県",
-        "pref_code": "23",
-        "address": "愛知県名古屋市中区錦3-15-13 セントラルパーク地下街",
-        "postal_code": "460-0003",
-        "phone": "052-951-7101",
-        "latitude": 35.1710,
-        "longitude": 136.9080,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.1710,136.9080"
-    },
-    {
-        "shop_name": "【#C-pla】Meieki Nagoya Station Underground",
-        "prefecture": "愛知県",
-        "pref_code": "23",
-        "address": "愛知県名古屋市中村区名駅1-2-1 名鉄百貨店本店メンズ館前",
-        "postal_code": "450-0002",
-        "phone": "052-585-1111",
-        "latitude": 35.1705,
-        "longitude": 136.8830,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=35.1705,136.8830"
-    },
-    # Fukuoka (code 40)
-    {
-        "shop_name": "【Gashapon Official Shop】Canal City Hakata",
-        "prefecture": "福岡県",
-        "pref_code": "40",
-        "address": "福岡県福岡市博多区住吉1-2 キャナルシティ博多 サウスビルB1F",
-        "postal_code": "812-0018",
-        "phone": "092-282-2525",
-        "latitude": 33.5898,
-        "longitude": 130.4110,
-        "stock_status": "Verfügbar / Flagship",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=33.5898,130.4110"
-    },
-    {
-        "shop_name": "【#C-pla】Tenjin Underground Mall (Chikatagai)",
-        "prefecture": "福岡県",
-        "pref_code": "40",
-        "address": "福岡県福岡市中央区天神2丁目地下3号 天神地下街",
-        "postal_code": "810-0001",
-        "phone": "092-711-1903",
-        "latitude": 33.5900,
-        "longitude": 130.4005,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=33.5900,130.4005"
-    },
-    # Hokkaido (code 1)
-    {
-        "shop_name": "【#C-pla】Sapporo Tanukikoji 5-chome Mega-Store (Ursprungsort von #C-pla)",
-        "prefecture": "北海道",
-        "pref_code": "1",
-        "address": "北海道札幌市中央区南3条西5丁目 狸小路商店街",
-        "postal_code": "060-0063",
-        "phone": "011-200-9880",
-        "latitude": 43.0570,
-        "longitude": 141.3520,
-        "stock_status": "Verfügbar / Flagship",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=43.0570,141.3520"
-    },
-    {
-        "shop_name": "【Gacha-Gacha no Mori】Sapporo Stellar Place (JR Sapporo Station)",
-        "prefecture": "北海道",
-        "pref_code": "1",
-        "address": "北海道札幌市中央区北5条西2丁目 札幌ステラプレイス5F",
-        "postal_code": "060-0505",
-        "phone": "011-209-5100",
-        "latitude": 43.0688,
-        "longitude": 141.3508,
-        "stock_status": "Verfügbar / Gacha-Hub",
-        "google_maps_url": "https://www.google.com/maps/search/?api=1&query=43.0688,141.3508"
-    }
-]
-
-
 def evaluate_status(title: str, release_date: Optional[str], raw_id: str) -> str:
     """Evaluates availability status for search overview cards."""
-    clean_id = raw_id.strip() if raw_id else ""
-    # Check if a live shop query already confirmed true stock status
-    cached_status = CACHE.get(f"stock_status_{clean_id}")
-    if cached_status:
-        return cached_status[0]
-    
-    raw_jan = clean_id[:13] if len(clean_id) >= 13 else clean_id
-    cached_jan = CACHE.get(f"stock_status_{raw_jan}")
-    if cached_jan:
-        return cached_jan[0]
-
     t_lower = title.lower()
     if any(k in t_lower for k in ["予約", "受注", "pre_", "登場予定", "発売予定"]):
         return "UPCOMING"
-    if "pre_" in clean_id.lower():
+    if "pre_" in raw_id.lower():
         return "UPCOMING"
     if release_date:
         if any(k in release_date for k in ["未定", "予定", "2026年11月", "2026年12月", "2027年"]):
@@ -570,12 +257,7 @@ def evaluate_status(title: str, release_date: Optional[str], raw_id: str) -> str
         m_year = re.search(r"(201\d|202[0-4])年", release_date)
         if m_year:
             return "ARCHIVED"
-
-    # Gacha-Island items and indie makers without individual machine sensors are stocked at Gacha Mega-Hubs
-    if clean_id.startswith("island_") or "island" in clean_id.lower():
-        return "HUBS_AVAILABLE"
-
-    return "RELEASED"
+    return "IN_STOCK"
 
 
 def normalize_title(title: str) -> str:
@@ -763,96 +445,6 @@ POPULAR_ITEMS = [
         "detail_url": "https://gashapon.jp/products/detail.php?jan_code=4582770081770000",
         "description": "みずタイプのポケモンたちがゆらゆら揺れるスイングマスコット！（Vorankündigung für November 2026）",
         "availability_status": "UPCOMING"
-    },
-    {
-        "id": "4582769769337000",
-        "maker": "Bandai",
-        "title": "TVアニメ『薬屋のひとりごと』 まちぼうけ",
-        "price": "400円",
-        "image_url": "https://bandai-a.akamaihd.net/bc/img/model/b/1000229230_1.jpg",
-        "jan_code": "4582769769337",
-        "release_date": "2026年9月 第4週",
-        "category": "ガシャポン",
-        "detail_url": "https://gashapon.jp/products/detail.php?jan_code=4582769769337000",
-        "description": "大人気アニメ「薬屋のひとりごと」の猫猫（マオマオ）や壬氏（ジンシ）たちがちょこんと座って待っているまちぼうけシリーズ！全国78店舗以上で稼働中。",
-        "availability_status": "IN_STOCK",
-        "other_sources": [
-            {
-                "name": "Gacha-Island",
-                "url": "https://gacha-island.jp/2659/",
-                "badge": "badge-island"
-            },
-            {
-                "name": "GachaNavi",
-                "url": "https://gachanavi.com/?s=%E8%96%AC%E5%B1%8B%E3%81%AE%E3%81%B2%E3%81%A8%E3%82%8A%E3%81%94%E3%81%A8",
-                "badge": "badge-other"
-            }
-        ]
-    },
-    {
-        "id": "island_softserve",
-        "maker": "Gacha Island (トイズスピリッツ)",
-        "title": "ざ・コンビニソフトめじるしチャーム (The Convenience Store Soft Serve)",
-        "price": "300円 / 全5種",
-        "image_url": "https://gacha-island.jp/wp-content/uploads/2026/06/za_konbini_soft.jpg",
-        "jan_code": None,
-        "release_date": "2026年7月",
-        "category": "めじるしチャーム",
-        "detail_url": "https://gacha-island.jp/48120/",
-        "description": "コンビニのあのアイスが超リアルなミニチュアめじるしチャームに！シリコンリング付きで傘やペットボトルに装着可能。全国のGacha-Hubsで展開。",
-        "availability_status": "HUBS_AVAILABLE",
-        "other_sources": [
-            {
-                "name": "Gacha-Island",
-                "url": "https://gacha-island.jp/48120/",
-                "badge": "badge-island"
-            },
-            {
-                "name": "GachaNavi",
-                "url": "https://gachanavi.com/?s=%E3%81%96%E3%83%BB%E3%82%B3%E3%83%B3%E3%83%93%E3%83%8B%E3%82%BD%E3%83%95%E3%83%88%E3%82%81%E3%81%98%E3%82%8B%E3%81%97%E3%83%81%E3%83%A3%E3%83%BC%E3%83%A0",
-                "badge": "badge-other"
-            }
-        ]
-    },
-    {
-        "id": "island_oyasai",
-        "maker": "Gacha Island (クオリア)",
-        "title": "おやさい妖精さん vol.1 (Vegetable Fairies)",
-        "price": "400円 / 全6種",
-        "image_url": "https://gacha-island.jp/wp-content/uploads/2026/05/oyasai_yousei.jpg",
-        "jan_code": None,
-        "release_date": "2026年8月",
-        "category": "カプセルフィギュア",
-        "detail_url": "https://gacha-island.jp/45902/",
-        "description": "ぽん吉氏が描く大人気「おやさい妖精さん」シリーズ！白菜犬やキャベツ豚など愛らしすぎる野菜の妖精たちがフィギュアに。",
-        "availability_status": "HUBS_AVAILABLE",
-        "other_sources": [
-            {
-                "name": "Gacha-Island",
-                "url": "https://gacha-island.jp/45902/",
-                "badge": "badge-island"
-            }
-        ]
-    },
-    {
-        "id": "island_51223",
-        "maker": "Gacha Island (ウルトラニュープランニング)",
-        "title": "けみかるハムスタースクイーズ！",
-        "price": "200円 / 全6種",
-        "image_url": "https://gacha-island.jp/wp-content/uploads/2026/09/29_\uff79\uff90\uff76\uff99\uff8a\uff91\uff7d\uff80\uff70\uff7d\uff78\uff72\uff70\uff7d\uff9e_w-300x274.jpg",
-        "jan_code": None,
-        "release_date": "2026年11月",
-        "category": "スクイーズ",
-        "detail_url": "https://gacha-island.jp/51223/",
-        "description": "ぷにぷに感触がたまらない、理科室モチーフのキュートな「けみかるハムスター」スクイーズ！",
-        "availability_status": "HUBS_AVAILABLE",
-        "other_sources": [
-            {
-                "name": "Gacha-Island",
-                "url": "https://gacha-island.jp/51223/",
-                "badge": "badge-island"
-            }
-        ]
     },
     {
         "id": "4582770137750000",
@@ -1619,19 +1211,6 @@ async def search_gacha(
     # Multi-source deduplication and cross-linking!
     merged_items = merge_and_cross_link_items(raw_items)
 
-    # Fallback to local verified items if scrapers returned 0 items
-    if not merged_items:
-        q_norm = normalize_title(search_q)
-        q_raw_norm = normalize_title(q)
-        for p in POPULAR_ITEMS:
-            p_title = p.get("title", "")
-            p_title_norm = normalize_title(p_title)
-            if (q_norm and (q_norm in p_title_norm or q_norm in p_title.lower())) or \
-               (q_raw_norm and (q_raw_norm in p_title_norm or q_raw_norm in p_title.lower())) or \
-               (search_q and search_q.lower() in p_title.lower()) or \
-               (translated_from and translated_from.lower() in p_title.lower()):
-                merged_items.append(GachaItem(**p))
-
     return SearchResponse(
         query=search_q,
         translated_from=translated_from,
@@ -1713,51 +1292,7 @@ async def get_shops(
             pref=pref_str
         )
     else:
-        # Independent makers / Gacha-Island items: Return official Gacha Mega-Hubs across Japan
-        pref_hubs: List[ShopLocation] = []
-        for hub in GACHA_HUBS:
-            if pref_str and pref_str not in ("", "all"):
-                if hub["pref_code"] != pref_str and pref_str not in hub["prefecture"]:
-                    continue
-
-            dist = calculate_distance(lat_val, lng_val, hub["latitude"], hub["longitude"])
-            pref_hubs.append(ShopLocation(
-                shop_name=hub["shop_name"],
-                prefecture=hub["prefecture"],
-                address=hub["address"],
-                postal_code=hub["postal_code"],
-                phone=hub["phone"],
-                latitude=hub["latitude"],
-                longitude=hub["longitude"],
-                distance_meters=dist,
-                stock_status=hub["stock_status"],
-                last_updated="Tagesaktuell im Gacha-Hub",
-                google_maps_url=hub["google_maps_url"]
-            ))
-
-        pref_hubs.sort(key=lambda s: s.distance_meters if s.distance_meters is not None else 9999999)
-        shops = pref_hubs
-        total_shops = len(shops)
-
-        availability_status = "HUBS_AVAILABLE"
-        status_label = f"🏬 An großen Fachzentren verfügbar ({total_shops} Mega-Stores)"
-        status_advice = f"Artikel von {prod_name or 'diesem Hersteller'} besitzen keine einzelnen Maschinensensoren. Sie werden in Japan flächendeckend an den großen Fachzentren (#C-pla, Gacha-Gacha no Mori, Akihabara Radio Kaikan) geführt!"
-        collector_links = generate_collector_links(prod_name or "Gashapon", None)
-
-        return ShopResponse(
-            maker="Gacha-Island / Fachzentren",
-            product_name=prod_name,
-            jan_code=code,
-            release_date=release_date,
-            prefecture=pref,
-            total_shops=total_shops,
-            last_data_check=f"Geprüft am {now_jst}",
-            availability_status=availability_status,
-            status_label=status_label,
-            status_advice=status_advice,
-            collector_links=collector_links,
-            shops=shops
-        )
+        raise HTTPException(status_code=400, detail="Only 'bandai' and 'takaratomy' support shop availability.")
 
     total_shops = len(shops)
     last_data_check = last_updated_str if last_updated_str else f"Geprüft am {now_jst}"
@@ -1769,26 +1304,18 @@ async def get_shops(
         availability_status = "IN_STOCK"
         status_label = f"🟢 Auf Lager ({total_shops} Standorte gemeldet)"
         status_advice = "Dieser Artikel ist aktuell an offiziellen Automaten und Shops verfügbar. Klicke auf einen Shop für direkte Google Maps Navigation."
-        if code:
-            CACHE.set(f"stock_status_{code}", ("IN_STOCK", total_shops))
     elif is_future:
         availability_status = "UPCOMING"
         status_label = f"⏳ Vorankündigung (Erscheint: {release_date})"
         status_advice = f"Dieser Artikel wurde offiziell für {release_date} angekündigt. Die Maschinen in Japan werden pünktlich zum Releasetag befüllt."
-        if code:
-            CACHE.set(f"stock_status_{code}", ("UPCOMING", 0))
     elif is_vintage:
         availability_status = "ARCHIVED"
         status_label = f"📦 Archiv / Sammlerstück (Release: {release_date or 'Früherer Jahrgang'})"
         status_advice = "Dieser Gacha stammt aus einer früheren Kollektion und ist an Münzautomaten nicht mehr im Umlauf. Für Sammler empfiehlt sich ein Besuch in Second-Hand-Shops in Akihabara oder Nakano Broadway."
-        if code:
-            CACHE.set(f"stock_status_{code}", ("ARCHIVED", 0))
     else:
         availability_status = "OUT_OF_STOCK"
         status_label = f"🔴 Derzeit vergriffen (0 Standorte gemeldet)"
         status_advice = "Aktuell melden die offiziellen Sensoren keinen Restbestand in den Automaten. Bei beliebten Sets lohnt sich ein erneuter Blick in 1-2 Wochen oder in Second-Hand-Börsen."
-        if code:
-            CACHE.set(f"stock_status_{code}", ("OUT_OF_STOCK", 0))
 
     collector_links = generate_collector_links(prod_name or "Gashapon", code)
 
