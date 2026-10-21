@@ -1056,6 +1056,60 @@ async def search_kitan(query: str, limit: int = 20) -> List[GachaItem]:
 # ---------------------------------------------------------
 # Gacha Island Scraping Logic (gacha-island.jp)
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# Manufacturer Normalization & Recognition (for Aggregators & Indie Brands)
+# ---------------------------------------------------------
+def normalize_maker_name(raw_maker: Optional[str], title: Optional[str] = None) -> str:
+    """
+    Intelligently identifies and standardizes Japanese manufacturer names
+    (e.g. バンダイ -> Bandai, タカラトミーアーツ -> Takara Tomy Arts, キタンクラブ -> Kitan Club).
+    """
+    combined = f"{raw_maker or ''} {title or ''}"
+
+    if any(k in combined for k in ["バンダイ", "Bandai", "BANDAI", "bandai"]):
+        return "Bandai"
+    if any(k in combined for k in ["タカラトミーアーツ", "タカラトミー", "Takara Tomy", "T-ARTS", "タカラ"]):
+        return "Takara Tomy Arts"
+    if any(k in combined for k in ["キタンクラブ", "奇譚クラブ", "Kitan", "KITAN", "kitan"]):
+        return "Kitan Club"
+    if any(k in combined for k in ["ブシロード", "Bushiroad"]):
+        return "Bushiroad"
+    if any(k in combined for k in ["スタンド・ストーンズ", "スタンドストーンズ", "stasto", "StaSto"]):
+        return "Stand Stones"
+    if any(k in combined for k in ["ケンエレファント", "Kenelephant"]):
+        return "Kenelephant"
+    if any(k in combined for k in ["J.DREAM", "Jドリーム", "ジェイドリーム"]):
+        return "J.Dream"
+    if any(k in combined for k in ["SO-TA", "so-ta", "ソータ", "スタジオソータ"]):
+        return "SO-TA"
+    if any(k in combined for k in ["クオリア", "Qualia"]):
+        return "Qualia"
+    if any(k in combined for k in ["エール", "Yell"]):
+        return "Yell"
+    if any(k in combined for k in ["アイピーフォー", "IP4"]):
+        return "IP4"
+    if any(k in combined for k in ["トイズキャビン", "Toys Cabin"]):
+        return "Toys Cabin"
+    if any(k in combined for k in ["トイズスピリッツ", "Toys Spirits"]):
+        return "Toys Spirits"
+    if any(k in combined for k in ["ターリン", "Tarlin", "エポック"]):
+        return "Tarlin"
+    if any(k in combined for k in ["レインボー", "Rainbow"]):
+        return "Rainbow"
+    if any(k in combined for k in ["パレード", "Parade"]):
+        return "Parade"
+    if any(k in combined for k in ["ピーナッツクラブ", "Peanuts Club"]):
+        return "Peanuts Club"
+    if any(k in combined for k in ["トーシン", "Toshin"]):
+        return "Toshin"
+
+    if raw_maker and raw_maker.strip():
+        m_clean = raw_maker.strip()
+        return m_clean if "Gacha Island" in m_clean else f"Gacha Island ({m_clean})"
+
+    return "Gacha Island"
+
+
 async def search_gacha_island(query: str, limit: int = 20) -> List[GachaItem]:
     clean_q = query.strip()
     cache_key = f"island_search_{clean_q}_{limit}"
@@ -1090,7 +1144,7 @@ async def search_gacha_island(query: str, limit: int = 20) -> List[GachaItem]:
 
                     price = None
                     release_date = None
-                    maker_name = "Gacha Island"
+                    raw_maker = None
 
                     # Parse .gacha-info-table inside .gacha-card-info
                     info_table = li.select_one(".gacha-info-table")
@@ -1106,8 +1160,9 @@ async def search_gacha_island(query: str, limit: int = 20) -> List[GachaItem]:
                                 elif "価格" in th_t:
                                     price = td_t
                                 elif "メーカー" in th_t:
-                                    maker_name = f"Gacha Island ({td_t})"
+                                    raw_maker = td_t
 
+                    maker_name = normalize_maker_name(raw_maker, title)
                     status = evaluate_status(title, release_date, item_id)
 
                     items.append(GachaItem(
@@ -1197,7 +1252,7 @@ async def search_gacha(
         tasks.append(search_bandai(search_q, limit=limit_val))
     if maker_lower in ("all", "takaratomy"):
         tasks.append(search_takaratomy(search_q, limit=limit_val))
-    if maker_lower in ("all", "island", "gacha-island"):
+    if maker_lower in ("all", "island", "gacha-island", "bandai", "kitan"):
         tasks.append(search_gacha_island(search_q, limit=limit_val))
     if maker_lower in ("all", "kitan"):
         tasks.append(search_kitan(search_q, limit=limit_val))
@@ -1210,6 +1265,9 @@ async def search_gacha(
 
     # Multi-source deduplication and cross-linking!
     merged_items = merge_and_cross_link_items(raw_items)
+
+    if maker_lower != "all":
+        merged_items = [it for it in merged_items if maker_lower in it.maker.lower()]
 
     return SearchResponse(
         query=search_q,
@@ -1275,14 +1333,15 @@ async def get_shops(
                     prod_name = search_res2[0].title
 
         if not code:
-            raise HTTPException(status_code=400, detail="JAN code or product name required for Bandai.")
-
-        shops, release_date, last_updated_str = await get_bandai_shops_and_meta(
-            jan_code=code,
-            pref=pref_str,
-            lat=lat_val,
-            lng=lng_val
-        )
+            shops = []
+            last_updated_str = "Bandai-Server Wartungsmodus / keine Live-Sensordaten verfügbar"
+        else:
+            shops, release_date, last_updated_str = await get_bandai_shops_and_meta(
+                jan_code=code,
+                pref=pref_str,
+                lat=lat_val,
+                lng=lng_val
+            )
 
     elif m in ("takaratomy", "tomy"):
         shops, release_date, last_updated_str = await get_takaratomy_shops_and_meta(
@@ -1292,7 +1351,8 @@ async def get_shops(
             pref=pref_str
         )
     else:
-        raise HTTPException(status_code=400, detail="Only 'bandai' and 'takaratomy' support shop availability.")
+        shops = []
+        last_updated_str = f"Aggregator-Daten ({m.title()})"
 
     total_shops = len(shops)
     last_data_check = last_updated_str if last_updated_str else f"Geprüft am {now_jst}"

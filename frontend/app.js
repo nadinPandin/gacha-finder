@@ -10,9 +10,19 @@
  * - Interactive Leaflet Japan map with live store count indicators
  */
 
-const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-  ? (window.location.port === '8000' ? '' : 'http://localhost:8000')
-  : '';
+// Dynamic Backend Base URL (Works locally, on network IP, or on GitHub Pages)
+let API_BASE = (function() {
+  const saved = localStorage.getItem('gacha_backend_url');
+  if (saved && saved.trim()) {
+    return saved.trim().replace(/\/+$/, '');
+  }
+  const origin = window.location.origin || '';
+  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    return window.location.port === '8000' ? '' : 'http://localhost:8000';
+  }
+  // Default for GitHub Pages or remote host
+  return 'http://localhost:8000';
+})();
 
 // Application State
 const state = {
@@ -79,6 +89,7 @@ const shopCountText = document.getElementById('shopCountText');
 
 // DOM Elements - Favorites Modal
 const btnOpenFavorites = document.getElementById('btnOpenFavorites');
+const btnBackendSettings = document.getElementById('btnBackendSettings');
 const favCounterBadge = document.getElementById('favCounterBadge');
 const favModal = document.getElementById('favModal');
 const btnCloseFav = document.getElementById('btnCloseFav');
@@ -191,6 +202,29 @@ function setupEventListeners() {
   favModal.addEventListener('click', (e) => {
     if (e.target === favModal) closeFavoritesModal();
   });
+
+  // Backend URL Settings Handler
+  if (btnBackendSettings) {
+    btnBackendSettings.addEventListener('click', () => {
+      const current = localStorage.getItem('gacha_backend_url') || (API_BASE || 'http://localhost:8000');
+      const input = prompt(
+        "Backend-Server URL für Scraper & Bestandsabfragen:\n\n" +
+        "• Lokal: http://localhost:8000\n" +
+        "• Im selben WLAN: http://<Deine-Mac-IP>:8000\n" +
+        "• Öffentlicher Tunnel: https://<deine-domain>.ngrok-free.app",
+        current
+      );
+      if (input !== null) {
+        const trimmed = input.trim().replace(/\/+$/, '');
+        if (trimmed) {
+          localStorage.setItem('gacha_backend_url', trimmed);
+        } else {
+          localStorage.removeItem('gacha_backend_url');
+        }
+        window.location.reload();
+      }
+    });
+  }
 
   tabFavItems.addEventListener('click', () => switchFavTab('items'));
   tabFavSearches.addEventListener('click', () => switchFavTab('searches'));
@@ -492,6 +526,58 @@ function renderPrefSelect(prefs) {
 
 // ---------------------------------------------------------
 // Load Popular / Featured Gachas
+// Fallback popular items for offline or initial GitHub Pages view
+const FALLBACK_POPULAR = [
+  {
+    id: "4570118183859000",
+    maker: "Bandai",
+    title: "ポケットモンスター ガシャっとコレクト07",
+    price: "300円",
+    image_url: "https://bandai-a.akamaihd.net/bc/img/model/b/1000258661_2.jpg",
+    jan_code: "4570118183859",
+    category: "ガシャポン",
+    detail_url: "https://gashapon.jp/products/detail.php?jan_code=4570118183859000",
+    availability_status: "IN_STOCK",
+    release_date: "2025年03月"
+  },
+  {
+    id: "4570118228185000",
+    maker: "Bandai",
+    title: "ジェムリーズ ポケットモンスター13 Summer",
+    price: "400円",
+    image_url: "https://bandai-a.akamaihd.net/bc/img/model/b/1000228795_2.jpg",
+    jan_code: "4570118228185",
+    category: "ガシャポン",
+    detail_url: "https://gashapon.jp/products/detail.php?jan_code=4570118228185000",
+    availability_status: "IN_STOCK",
+    release_date: "2025年06月"
+  },
+  {
+    id: "Y903991",
+    maker: "Takara Tomy Arts",
+    title: "ポケモン おやすみフレンズ なかよくうとうと",
+    price: "300円 / 全4種",
+    image_url: "https://www.takaratomy-arts.co.jp/items/itemimages/Y903991_1.jpg",
+    jan_code: "4904790903991",
+    category: "ガチャ",
+    detail_url: "https://www.takaratomy-arts.co.jp/items/item.html?n=Y903991",
+    availability_status: "IN_STOCK",
+    release_date: "2025年04月"
+  },
+  {
+    id: "Y098703",
+    maker: "Takara Tomy Arts",
+    title: "肩ズンFig. 葬送のフリーレン",
+    price: "400円 / 全4種",
+    image_url: "https://www.takaratomy-arts.co.jp/items/itemimages/Y098703_1.jpg",
+    jan_code: "4904790098703",
+    category: "ガチャ",
+    detail_url: "https://www.takaratomy-arts.co.jp/items/item.html?n=Y098703",
+    availability_status: "IN_STOCK",
+    release_date: "2024年11月"
+  }
+];
+
 // ---------------------------------------------------------
 async function loadPopularGachas() {
   setLoading(true);
@@ -501,13 +587,15 @@ async function loadPopularGachas() {
       const data = await res.json();
       state.popularItems = data;
       renderPopularView();
+      return;
     }
   } catch (err) {
-    console.error('Failed to load popular items:', err);
-    renderProducts([]);
+    console.warn('Backend currently unreachable, using featured fallback items:', err);
   } finally {
     setLoading(false);
   }
+  state.popularItems = FALLBACK_POPULAR;
+  renderPopularView();
 }
 
 function renderPopularView() {
@@ -555,6 +643,12 @@ async function executeSearch(query) {
   } catch (err) {
     console.error('Search failed:', err);
     emptyState.style.display = 'block';
+    emptyState.innerHTML = `
+      <div class="empty-icon">⚠️</div>
+      <h3>Verbindung zum Backend fehlgeschlagen</h3>
+      <p style="margin-top:8px; line-height:1.5;">Konnte keine Daten von <code>${escapeHtml(API_BASE || 'lokalem Server')}</code> abrufen.<br>
+      Stelle sicher, dass das Backend läuft (z. B. mit <code>uvicorn backend.app:app</code> auf Port 8000), oder klicke oben auf <strong>⚙️ Backend</strong> um die Adresse anzupassen.</p>
+    `;
     resultsCount.textContent = '0 Treffer';
   } finally {
     setLoading(false);

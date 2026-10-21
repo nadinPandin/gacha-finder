@@ -171,6 +171,29 @@ body {
   transform: translateY(-1px);
 }
 
+/* Backend Settings Header Button */
+.btn-backend-header {
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+  color: #475569;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-backend-header:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+  transform: translateY(-1px);
+}
+
 .fav-badge {
   background: #e11d48;
   color: #fff;
@@ -1685,6 +1708,10 @@ body {
   }
 
   .btn-fav-header .fav-text {
+    display: none;
+  }
+
+  .btn-backend-header .backend-btn-text {
     display: none;
   }
 
