@@ -783,6 +783,12 @@ body {
   color: #6d28d9;
 }
 
+.card-status-badge.status-check-stock {
+  background: #f0f9ff;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+}
+
 .card-badges-row {
   display: flex;
   align-items: center;

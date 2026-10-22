@@ -205,7 +205,8 @@ class GachaItem(BaseModel):
     category: Optional[str] = None
     detail_url: Optional[str] = None
     description: Optional[str] = None
-    availability_status: str = "IN_STOCK"  # IN_STOCK, OUT_OF_STOCK, UPCOMING, ARCHIVED
+    availability_status: str = "CHECK_STOCK"  # IN_STOCK, OUT_OF_STOCK, UPCOMING, ARCHIVED, CHECK_STOCK
+    shop_count: Optional[int] = None
     is_vintage: bool = False
     other_sources: List[SourceLink] = Field(default_factory=list)
 
@@ -244,20 +245,31 @@ class ShopResponse(BaseModel):
     shops: List[ShopLocation]
 
 
-def evaluate_status(title: str, release_date: Optional[str], raw_id: str) -> str:
-    """Evaluates availability status for search overview cards."""
+def evaluate_status(title: str, release_date: Optional[str], raw_id: str) -> Tuple[str, Optional[int]]:
+    """Evaluates availability status and shop count for search overview cards."""
+    clean_id = raw_id.strip() if raw_id else ""
+    cached_status = CACHE.get(f"stock_status_{clean_id}")
+    if cached_status:
+        return cached_status[0], cached_status[1]
+
+    raw_jan = clean_id[:13] if len(clean_id) >= 13 else clean_id
+    cached_jan = CACHE.get(f"stock_status_{raw_jan}")
+    if cached_jan:
+        return cached_jan[0], cached_jan[1]
+
     t_lower = title.lower()
     if any(k in t_lower for k in ["予約", "受注", "pre_", "登場予定", "発売予定"]):
-        return "UPCOMING"
-    if "pre_" in raw_id.lower():
-        return "UPCOMING"
+        return "UPCOMING", None
+    if "pre_" in clean_id.lower():
+        return "UPCOMING", None
     if release_date:
         if any(k in release_date for k in ["未定", "予定", "2026年11月", "2026年12月", "2027年"]):
-            return "UPCOMING"
+            return "UPCOMING", None
         m_year = re.search(r"(201\d|202[0-4])年", release_date)
         if m_year:
-            return "ARCHIVED"
-    return "IN_STOCK"
+            return "ARCHIVED", 0
+
+    return "CHECK_STOCK", None
 
 
 def normalize_title(title: str) -> str:
@@ -533,7 +545,7 @@ async def search_bandai(query: str, limit: int = 25) -> List[GachaItem]:
 
                 full_detail_url = f"https://gashapon.jp/products/detail.php?jan_code={full_jan}"
 
-                status = evaluate_status(title, None, full_jan)
+                status, s_count = evaluate_status(title, None, full_jan)
 
                 items.append(GachaItem(
                     id=full_jan,
@@ -544,7 +556,8 @@ async def search_bandai(query: str, limit: int = 25) -> List[GachaItem]:
                     jan_code=raw_jan,
                     category=category,
                     detail_url=full_detail_url,
-                    availability_status=status
+                    availability_status=status,
+                    shop_count=s_count
                 ))
 
             # Concurrently enrich items with release dates from detail pages
@@ -552,9 +565,10 @@ async def search_bandai(query: str, limit: int = 25) -> List[GachaItem]:
                 meta_key = f"bandai_meta_{item.id}"
                 cached_meta = CACHE.get(meta_key)
                 if cached_meta:
-                    item.release_date, item.price, rel_status = cached_meta
+                    item.release_date, item.price, rel_status, rel_count = cached_meta
                     if rel_status:
                         item.availability_status = rel_status
+                        item.shop_count = rel_count
                     return
                 try:
                     r_det = await client.get(item.detail_url)
@@ -565,8 +579,8 @@ async def search_bandai(query: str, limit: int = 25) -> List[GachaItem]:
                         m_pr = re.search(r"<dt[^>]*>価格\(税込\)</dt>\s*<dd[^>]*>(.*?)</dd>", r_det.text, re.DOTALL)
                         if m_pr and not item.price:
                             item.price = re.sub(r"<[^>]+>", "", m_pr.group(1)).strip()
-                        item.availability_status = evaluate_status(item.title, item.release_date, item.id)
-                        CACHE.set(meta_key, (item.release_date, item.price, item.availability_status))
+                        item.availability_status, item.shop_count = evaluate_status(item.title, item.release_date, item.id)
+                        CACHE.set(meta_key, (item.release_date, item.price, item.availability_status, item.shop_count))
                 except Exception:
                     pass
 
@@ -627,7 +641,7 @@ async def get_bandai_detail(jan_code: str, client: Optional[httpx.AsyncClient] =
                 elif "価格" in dt_txt:
                     price = dd.get_text().strip()
 
-        status = evaluate_status(title, release_date, full_jan)
+        status, s_count = evaluate_status(title, release_date, full_jan)
 
         item = GachaItem(
             id=full_jan,
@@ -640,7 +654,8 @@ async def get_bandai_detail(jan_code: str, client: Optional[httpx.AsyncClient] =
             category="ガシャポン",
             detail_url=url,
             description=desc,
-            availability_status=status
+            availability_status=status,
+            shop_count=s_count
         )
         CACHE.set(cache_key, item)
         return item
@@ -799,7 +814,7 @@ async def search_takaratomy(query: str, limit: int = 25) -> List[GachaItem]:
                     if img_url and not img_url.startswith("http"):
                         img_url = urllib.parse.urljoin("https://www.takaratomy-arts.co.jp", img_url)
 
-                    status = evaluate_status(title, None, item_id)
+                    status, s_count = evaluate_status(title, None, item_id)
 
                     items.append(GachaItem(
                         id=item_id,
@@ -809,7 +824,8 @@ async def search_takaratomy(query: str, limit: int = 25) -> List[GachaItem]:
                         jan_code=jan_code,
                         category="ガチャ",
                         detail_url=data.get("url"),
-                        availability_status=status
+                        availability_status=status,
+                        shop_count=s_count
                     ))
         except Exception as e:
             print(f"[Takara Tomy Search Error] {e}")
@@ -865,7 +881,7 @@ async def get_takaratomy_detail(item_id: str, client: Optional[httpx.AsyncClient
                 elif "発売時期" in t or "発売日" in t:
                     release_date = dd.get_text().strip()
 
-        status = evaluate_status(title, release_date, clean_id)
+        status, s_count = evaluate_status(title, release_date, clean_id)
 
         item = GachaItem(
             id=clean_id,
@@ -878,7 +894,8 @@ async def get_takaratomy_detail(item_id: str, client: Optional[httpx.AsyncClient
             category="ガチャ",
             detail_url=url,
             description=desc,
-            availability_status=status
+            availability_status=status,
+            shop_count=s_count
         )
         CACHE.set(cache_key, item)
         return item
@@ -1163,7 +1180,7 @@ async def search_gacha_island(query: str, limit: int = 20) -> List[GachaItem]:
                                     raw_maker = td_t
 
                     maker_name = normalize_maker_name(raw_maker, title)
-                    status = evaluate_status(title, release_date, item_id)
+                    status, s_count = evaluate_status(title, release_date, item_id)
 
                     items.append(GachaItem(
                         id=item_id,
@@ -1174,7 +1191,8 @@ async def search_gacha_island(query: str, limit: int = 20) -> List[GachaItem]:
                         image_url=img_src,
                         category="ガチャアイランド",
                         detail_url=href,
-                        availability_status=status
+                        availability_status=status,
+                        shop_count=s_count
                     ))
         except Exception as e:
             print(f"[Gacha Island Search Error] {e}")
@@ -1364,18 +1382,26 @@ async def get_shops(
         availability_status = "IN_STOCK"
         status_label = f"🟢 Auf Lager ({total_shops} Standorte gemeldet)"
         status_advice = "Dieser Artikel ist aktuell an offiziellen Automaten und Shops verfügbar. Klicke auf einen Shop für direkte Google Maps Navigation."
+        if code: CACHE.set(f"stock_status_{code}", ("IN_STOCK", total_shops))
+        if item_id_str: CACHE.set(f"stock_status_{item_id_str}", ("IN_STOCK", total_shops))
     elif is_future:
         availability_status = "UPCOMING"
         status_label = f"⏳ Vorankündigung (Erscheint: {release_date})"
         status_advice = f"Dieser Artikel wurde offiziell für {release_date} angekündigt. Die Maschinen in Japan werden pünktlich zum Releasetag befüllt."
+        if code: CACHE.set(f"stock_status_{code}", ("UPCOMING", None))
+        if item_id_str: CACHE.set(f"stock_status_{item_id_str}", ("UPCOMING", None))
     elif is_vintage:
         availability_status = "ARCHIVED"
         status_label = f"📦 Archiv / Sammlerstück (Release: {release_date or 'Früherer Jahrgang'})"
         status_advice = "Dieser Gacha stammt aus einer früheren Kollektion und ist an Münzautomaten nicht mehr im Umlauf. Für Sammler empfiehlt sich ein Besuch in Second-Hand-Shops in Akihabara oder Nakano Broadway."
+        if code: CACHE.set(f"stock_status_{code}", ("ARCHIVED", 0))
+        if item_id_str: CACHE.set(f"stock_status_{item_id_str}", ("ARCHIVED", 0))
     else:
         availability_status = "OUT_OF_STOCK"
         status_label = f"🔴 Derzeit vergriffen (0 Standorte gemeldet)"
         status_advice = "Aktuell melden die offiziellen Sensoren keinen Restbestand in den Automaten. Bei beliebten Sets lohnt sich ein erneuter Blick in 1-2 Wochen oder in Second-Hand-Börsen."
+        if code: CACHE.set(f"stock_status_{code}", ("OUT_OF_STOCK", 0))
+        if item_id_str: CACHE.set(f"stock_status_{item_id_str}", ("OUT_OF_STOCK", 0))
 
     collector_links = generate_collector_links(prod_name or "Gashapon", code)
 

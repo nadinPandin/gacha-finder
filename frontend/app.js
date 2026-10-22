@@ -669,17 +669,41 @@ function setLoading(isLoading) {
 // ---------------------------------------------------------
 // Helper: Card Availability Status Badge
 // ---------------------------------------------------------
-function getStatusBadgeHtml(status) {
+function getStatusBadgeHtml(status, count) {
   switch (status) {
     case 'IN_STOCK':
+      if (typeof count === 'number' && count > 0) {
+        return `<div class="card-status-badge status-in-stock"><span>🟢</span> <span>An ${count} Standorten</span></div>`;
+      }
       return `<div class="card-status-badge status-in-stock"><span>🟢</span> <span>Auf Lager</span></div>`;
+    case 'OUT_OF_STOCK':
+      return `<div class="card-status-badge status-out-of-stock"><span>🔴</span> <span>Ausverkauft (0 Standorte)</span></div>`;
     case 'UPCOMING':
       return `<div class="card-status-badge status-upcoming"><span>⏳</span> <span>Vorankündigung</span></div>`;
     case 'ARCHIVED':
-      return `<div class="card-status-badge status-archived"><span>📦</span> <span>Archiv / Vintage</span></div>`;
-    case 'OUT_OF_STOCK':
+      return `<div class="card-status-badge status-archived"><span>📦</span> <span>Archiv / Vergriffen</span></div>`;
+    case 'CHECK_STOCK':
     default:
-      return `<div class="card-status-badge status-out-of-stock"><span>🔴</span> <span>Vergriffen</span></div>`;
+      return `<div class="card-status-badge status-check-stock"><span>📍</span> <span>Bestand auf Karte prüfen</span></div>`;
+  }
+}
+
+function updateCardStatusInDOM(productId, status, count) {
+  if (!productId) return;
+  try {
+    const selector = `.product-card[data-id="${CSS.escape(productId)}"]`;
+    const cards = document.querySelectorAll(selector);
+    cards.forEach(card => {
+      const badgeRow = card.querySelector('.card-badges-row');
+      if (badgeRow) {
+        const existingBadge = badgeRow.querySelector('.card-status-badge');
+        if (existingBadge) {
+          existingBadge.outerHTML = getStatusBadgeHtml(status, count);
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('DOM card update skipped:', e);
   }
 }
 
@@ -693,6 +717,7 @@ function renderProducts(items) {
   items.forEach((item) => {
     const card = document.createElement('div');
     card.className = 'product-card';
+    card.setAttribute('data-id', item.id);
 
     let badgeClass = 'badge-other';
     const mLower = (item.maker || '').toLowerCase();
@@ -705,7 +730,7 @@ function renderProducts(items) {
     const imgSrc = item.image_url || fallbackImg;
 
     const isFav = isItemFavorited(item.id);
-    const statusHtml = getStatusBadgeHtml(item.availability_status);
+    const statusHtml = getStatusBadgeHtml(item.availability_status, item.shop_count);
     const releaseText = item.release_date ? `📅 Release: ${escapeHtml(item.release_date)}` : '📅 Release: Aktuell';
 
     const isKitan = mLower.includes('kitan');
@@ -782,6 +807,37 @@ function renderProducts(items) {
     }
 
     productGrid.appendChild(card);
+  });
+
+  // Automatically pre-check stock for top results in background
+  autoCheckTopResultsStock(items);
+}
+
+function autoCheckTopResultsStock(items) {
+  if (!Array.isArray(items)) return;
+  const toCheck = items.slice(0, 3).filter(it => it.availability_status === 'CHECK_STOCK' && !it.shop_count);
+  toCheck.forEach((it, idx) => {
+    setTimeout(async () => {
+      try {
+        const makerParam = it.maker.toLowerCase().includes('bandai') ? 'bandai' : 'takaratomy';
+        let qUrl = `${API_BASE}/api/shops?maker=${makerParam}&pref=`;
+        if (it.jan_code) qUrl += `&jan_code=${encodeURIComponent(it.jan_code)}`;
+        if (it.id) qUrl += `&item_id=${encodeURIComponent(it.id)}`;
+        if (it.title) qUrl += `&product_name=${encodeURIComponent(it.title)}`;
+
+        const res = await fetch(qUrl);
+        if (res.ok) {
+          const data = await res.json();
+          const count = (data.shops || []).length;
+          const status = data.availability_status || (count > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK');
+          it.availability_status = status;
+          it.shop_count = count;
+          updateCardStatusInDOM(it.id, status, count);
+        }
+      } catch (e) {
+        // Silently keep default badge
+      }
+    }, (idx + 1) * 800);
   });
 }
 
@@ -875,6 +931,13 @@ async function fetchShopsForActiveProduct() {
     state.regionCache[''] = state.allShops; // Cache All Japan results
     state.filteredShops = [...state.allShops];
 
+    // Real-time update of product card in search list
+    const finalCount = state.allShops.length;
+    const finalStatus = data.availability_status || (finalCount > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK');
+    product.availability_status = finalStatus;
+    product.shop_count = finalCount;
+    updateCardStatusInDOM(product.id, finalStatus, finalCount);
+
     // Update release date & last checked timestamp
     if (data.release_date) {
       modalReleaseDate.textContent = `📅 Release: ${data.release_date}`;
@@ -897,6 +960,7 @@ async function fetchShopsForActiveProduct() {
     modalStatusBanner.innerHTML = `⚠️ Keine Live-Standorte gemeldet (Siehe Sammler-Tipps unten)`;
     modalStatusBanner.className = 'modal-status-banner status-out-of-stock';
     modalStatusBanner.style.display = 'flex';
+    updateCardStatusInDOM(product.id, 'OUT_OF_STOCK', 0);
   } finally {
     shopLoading.style.display = 'none';
   }
