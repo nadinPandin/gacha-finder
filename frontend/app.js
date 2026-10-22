@@ -12,16 +12,22 @@
 
 // Dynamic Backend Base URL (Works locally, on network IP, or on GitHub Pages)
 let API_BASE = (function() {
+  const origin = window.location.origin || '';
   const saved = localStorage.getItem('gacha_backend_url');
-  if (saved && saved.trim()) {
+
+  // If on Cloudflare Tunnel or local server, ignore stale localhost:8000 in localStorage
+  if (saved && saved.trim() && (saved.trim() !== 'http://localhost:8000' || (!origin.includes('trycloudflare.com') && origin.includes('github.io')))) {
     return saved.trim().replace(/\/+$/, '');
   }
-  const origin = window.location.origin || '';
-  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-    return window.location.port === '8000' ? '' : 'http://localhost:8000';
+
+  // If on GitHub Pages, default to the live HTTPS Cloudflare tunnel
+  if (origin.includes('github.io')) {
+    return 'https://solaris-coast-losing-delays.trycloudflare.com';
   }
-  // Default for GitHub Pages or remote host
-  return 'http://localhost:8000';
+
+  // Everywhere else (localhost, local Wi-Fi IP, or trycloudflare.com):
+  // The API is on the SAME server! Always use relative path ''
+  return '';
 })();
 
 // Application State
